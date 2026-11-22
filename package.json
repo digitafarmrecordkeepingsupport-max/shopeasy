@@ -1,0 +1,49 @@
+{
+  "name": "shopeasy",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "tunnel": "expo start --tunnel ngrok",
+    "start:tunnel": "expo start --tunnel ngrok",
+    "start:ngrok": "node scripts/tunnel-ngrok.js",
+    "admin:dev": "npm --prefix admin-web run dev",
+    "admin:build": "npm --prefix admin-web run build",
+    "create-admin": "node scripts/create-admin.js",
+    "seed:mongodb": "node scripts/seed-mongodb.js",
+    "create-admin:mongodb": "node scripts/create-admin-mongodb.js",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@supabase/supabase-js": "^2.49.1",
+    "cloudinary": "^2.11.0",
+    "dotenv": "^18.0.10",
+    "expo": "^58.0.0",
+    "expo-constants": "~58.0.16",
+    "expo-image": "~58.0.18",
+    "expo-image-picker": "~58.0.10",
+    "expo-linear-gradient": "~58.0.4",
+    "expo-linking": "~58.0.17",
+    "expo-router": "~58.0.32",
+    "expo-status-bar": "~58.0.5",
+    "mongoose": "^9.12.3",
+    "promise": "^8.3.0",
+    "query-string": "^7.1.3",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "~5.11.1",
+    "react-native-screens": "~4.30.1",
+    "react-native-svg": "15.16.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@expo/ngrok": "^4.1.0",
+    "@types/react": "~19.3.0",
+    "typescript": "^5.3.3"
+  },
+  "private": true
+}
