@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
     // Handle Multipart Form Data
     if (contentType.includes('multipart/form-data')) {
-      const formData = await req.formData();
+      const formData: any = await req.formData();
       const file = formData.get('file') as File | null;
       const folder = (formData.get('folder') as string) || 'shopeasy/products';
 

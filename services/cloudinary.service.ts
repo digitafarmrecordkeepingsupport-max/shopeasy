@@ -13,9 +13,9 @@ export interface CloudinaryUploadResponse {
 }
 
 // Configurable via EXPO_PUBLIC_ environment variables in .env
-const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || 'shopeasy';
+const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || 'mbeaitwj';
 const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'shopeasy_preset';
-const BACKEND_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const BACKEND_API_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://shopeasy-sepia.vercel.app/api').replace(/\/$/, '');
 
 export const CloudinaryMobileService = {
   /**
