@@ -21,32 +21,22 @@ export async function GET(req: NextRequest) {
 
       const orders = await Order.find(query).sort({ createdAt: -1 }).lean();
 
-      if (orders.length > 0) {
-        return NextResponse.json({
-          success: true,
-          count: orders.length,
-          data: orders.map((o: any) => ({
-            ...o,
-            id: o._id.toString(),
-          })),
-        });
-      }
+      return NextResponse.json({
+        success: true,
+        source: 'mongodb',
+        count: orders.length,
+        data: orders.map((o: any) => ({
+          ...o,
+          id: o._id.toString(),
+        })),
+      });
     }
 
     return NextResponse.json({
       success: true,
-      source: 'fallback',
-      data: [
-        {
-          id: 'ord-108',
-          orderNumber: 'SE20251125-108',
-          customerName: 'John Doe',
-          customerEmail: 'john.doe@gmail.com',
-          totalAmount: 47000,
-          orderStatus: 'delivered',
-          createdAt: new Date().toISOString(),
-        },
-      ],
+      source: 'empty',
+      count: 0,
+      data: [],
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

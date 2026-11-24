@@ -10,30 +10,22 @@ export async function GET() {
       await connectToDatabase();
       const categories = await Category.find().sort({ displayOrder: 1, name: 1 }).lean();
 
-      if (categories.length > 0) {
-        return NextResponse.json({
-          success: true,
-          source: 'mongodb',
-          count: categories.length,
-          data: categories.map((c: any) => ({
-            ...c,
-            id: c._id.toString(),
-          })),
-        });
-      }
+      return NextResponse.json({
+        success: true,
+        source: 'mongodb',
+        count: categories.length,
+        data: categories.map((c: any) => ({
+          ...c,
+          id: c._id.toString(),
+        })),
+      });
     }
 
     return NextResponse.json({
       success: true,
-      source: 'fallback',
-      data: [
-        { id: 'cat-fashion', name: 'Fashion', slug: 'fashion', itemCount: 42, isActive: true },
-        { id: 'cat-electronics', name: 'Electronics', slug: 'electronics', itemCount: 56, isActive: true },
-        { id: 'cat-home', name: 'Home', slug: 'home', itemCount: 38, isActive: true },
-        { id: 'cat-beauty', name: 'Beauty', slug: 'beauty', itemCount: 28, isActive: true },
-        { id: 'cat-sports', name: 'Sports', slug: 'sports', itemCount: 20, isActive: true },
-        { id: 'cat-accessories', name: 'Accessories', slug: 'accessories', itemCount: 14, isActive: false },
-      ],
+      source: 'empty',
+      count: 0,
+      data: [],
     });
   } catch (error: any) {
     console.error('Categories API GET Error:', error);

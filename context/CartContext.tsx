@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { CartItem, Product } from '../types';
 import { StorageService, StorageKeys } from '../services/storage.service';
-import { MOCK_PRODUCTS } from '../data/mock-products';
 
 interface CartContextType {
   items: CartItem[];
@@ -28,32 +27,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadCart = async () => {
     try {
       const saved = await StorageService.getItem<CartItem[]>(StorageKeys.CART, []);
-      if (saved && saved.length >= 3) {
+      if (saved && Array.isArray(saved)) {
         setItems(saved);
       } else {
-        // Pre-seed 3 demo items as displayed on the reference image (Wireless Earbuds, Smart Watch, Casual Sneakers)
-        const initialDemo: CartItem[] = [
-          {
-            id: 'cart-' + MOCK_PRODUCTS[0].id,
-            product: MOCK_PRODUCTS[0], // Wireless Earbuds ₦25,000
-            quantity: 1,
-          },
-          {
-            id: 'cart-' + MOCK_PRODUCTS[1].id,
-            product: MOCK_PRODUCTS[1], // Smart Watch ₦45,000
-            quantity: 1,
-          },
-          {
-            id: 'cart-' + MOCK_PRODUCTS[2].id,
-            product: MOCK_PRODUCTS[2], // Casual Sneakers ₦35,000
-            quantity: 1,
-          },
-        ];
-        setItems(initialDemo);
-        await StorageService.setItem(StorageKeys.CART, initialDemo);
+        setItems([]);
       }
     } catch (e) {
       console.warn('Failed to load cart:', e);
+      setItems([]);
     } finally {
       setIsInitialized(true);
     }
@@ -69,19 +50,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let updated: CartItem[];
 
     if (existingIndex > -1) {
-      updated = [...items];
-      updated[existingIndex] = {
-        ...updated[existingIndex],
-        quantity: updated[existingIndex].quantity + quantity,
-      };
+      updated = items.map((item, idx) =>
+        idx === existingIndex ? { ...item, quantity: item.quantity + quantity } : item
+      );
     } else {
       const newItem: CartItem = {
         id: 'cart-' + product.id + '-' + Date.now(),
         product,
         quantity,
       };
-      updated = [newItem, ...items];
+      updated = [...items, newItem];
     }
+
     persistCart(updated);
   };
 
@@ -94,13 +74,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         return item;
       })
-      .filter((item): item is CartItem => item !== null);
+      .filter(Boolean) as CartItem[];
 
     persistCart(updated);
   };
 
   const removeFromCart = (itemId: string) => {
-    const updated = items.filter((i) => i.id !== itemId);
+    const updated = items.filter((item) => item.id !== itemId);
     persistCart(updated);
   };
 
@@ -110,7 +90,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const deliveryFee = items.length > 0 ? 2000 : 0;
+  const deliveryFee = subtotal > 50000 || subtotal === 0 ? 0 : 2000;
   const total = subtotal + deliveryFee;
 
   return (

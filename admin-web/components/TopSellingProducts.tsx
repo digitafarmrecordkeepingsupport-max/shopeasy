@@ -26,34 +26,40 @@ export default function TopSellingProducts({ products }: TopSellingProductsProps
         </Link>
       </div>
 
-      <div className="space-y-3.5">
-        {products.map((prod) => (
-          <div
-            key={prod.id}
-            className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F9F7FE] transition border border-transparent hover:border-[#F0EBF8]"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-xl bg-[#F7F5FC] overflow-hidden border border-[#EAE6F3] shrink-0">
-                <img
-                  src={prod.image_urls[0]}
-                  alt={prod.name}
-                  className="w-full h-full object-cover"
-                />
+      {products.length === 0 ? (
+        <div className="py-12 text-center text-xs text-[#77738A]">
+          No products recorded yet. Create products from the Products tab.
+        </div>
+      ) : (
+        <div className="space-y-3.5">
+          {products.map((prod) => (
+            <div
+              key={prod.id}
+              className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F9F7FE] transition border border-transparent hover:border-[#F0EBF8]"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-xl bg-[#F7F5FC] overflow-hidden border border-[#EAE6F3] shrink-0">
+                  <img
+                    src={prod.image_urls[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=300'}
+                    alt={prod.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-[#171428] line-clamp-1">{prod.name}</div>
+                  <div className="text-xs font-black text-[#6515D5] mt-0.5">{formatNaira(prod.price)}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-sm font-bold text-[#171428] line-clamp-1">{prod.name}</div>
-                <div className="text-xs font-black text-[#6515D5] mt-0.5">{formatNaira(prod.price)}</div>
-              </div>
-            </div>
 
-            {prod.growth && (
-              <span className="text-xs font-bold text-[#16A34A] bg-[#DCFCE7]/70 px-2 py-0.5 rounded-md shrink-0">
-                {prod.growth}
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
+              {prod.growth && (
+                <span className="text-xs font-bold text-[#16A34A] bg-[#DCFCE7]/70 px-2 py-0.5 rounded-md shrink-0">
+                  {prod.growth}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

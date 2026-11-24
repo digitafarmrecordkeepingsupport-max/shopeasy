@@ -109,7 +109,9 @@ export default function MarketingPage() {
         conversions: 780,
       });
 
-      setCampaigns((prev) => [created, ...prev]);
+      if (created) {
+        setCampaigns((prev) => [created, ...prev]);
+      }
     }
 
     setIsPromoModalOpen(false);

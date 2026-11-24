@@ -1,4 +1,3 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { Customer, AccountStatus } from '../types';
 
 export interface CustomerStats {
@@ -12,139 +11,132 @@ export interface CustomerStats {
   vip_growth: string;
 }
 
-const INITIAL_CUSTOMERS: Customer[] = [
-  {
-    id: 'usr-1',
-    full_name: 'Jane Doe',
-    email: 'jane.doe@mail.com',
-    phone_number: '08012345678',
-    avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop',
-    role: 'customer',
-    account_status: 'active',
-    created_at: '2025-11-10T10:00:00Z',
-    total_orders: 5,
-    total_spent: 245000,
-  },
-  {
-    id: 'usr-2',
-    full_name: 'Michael Johnson',
-    email: 'michael.johnson@mail.com',
-    phone_number: '08087654321',
-    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop',
-    role: 'customer',
-    account_status: 'active',
-    created_at: '2025-11-08T12:30:00Z',
-    total_orders: 3,
-    total_spent: 127000,
-  },
-  {
-    id: 'usr-3',
-    full_name: 'Sarah Williams',
-    email: 'sarah.williams@mail.com',
-    phone_number: '08111222333',
-    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop',
-    role: 'customer',
-    account_status: 'active',
-    created_at: '2025-11-05T09:15:00Z',
-    total_orders: 7,
-    total_spent: 320000,
-  },
-  {
-    id: 'usr-4',
-    full_name: 'David Brown',
-    email: 'david.brown@mail.com',
-    phone_number: '08099887766',
-    avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200&auto=format&fit=crop',
-    role: 'customer',
-    account_status: 'inactive',
-    created_at: '2025-11-02T16:40:00Z',
-    total_orders: 2,
-    total_spent: 89000,
-  },
-  {
-    id: 'usr-5',
-    full_name: 'Grace Taylor',
-    email: 'grace.taylor@mail.com',
-    phone_number: '08133445566',
-    avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop',
-    role: 'customer',
-    account_status: 'active',
-    created_at: '2025-10-28T14:20:00Z',
-    total_orders: 4,
-    total_spent: 176000,
-  },
-];
-
 export const AdminCustomerService = {
+  /**
+   * Computes real customer metrics from MongoDB Atlas
+   */
   async getStats(): Promise<CustomerStats> {
-    if (isSupabaseConfigured() && supabase) {
-      const { data } = await supabase.rpc('get_customer_metrics');
-      if (data) {
-        return {
-          total_customers: data.total_customers || 3240,
-          active_customers: data.active_customers || 2891,
-          new_customers: data.new_customers || 349,
-          vip_customers: data.vip_customers || 478,
-          total_growth: '+15%',
-          active_growth: '+12%',
-          new_growth: '+20%',
-          vip_growth: '+18%',
-        };
-      }
-    }
+    try {
+      const customers = await this.getCustomers('all');
+      const total = customers.length;
+      const active = customers.filter((c) => c.account_status === 'active').length;
+      const vip = customers.filter((c) => (c.total_spent || 0) >= 100000).length;
+      const newCust = customers.filter((c) => {
+        if (!c.created_at) return false;
+        const diffDays = (Date.now() - new Date(c.created_at).getTime()) / (1000 * 60 * 60 * 24);
+        return diffDays <= 30;
+      }).length;
 
-    // Reference Metrics from Image 3
-    return {
-      total_customers: 3240,
-      active_customers: 2891,
-      new_customers: 349,
-      vip_customers: 478,
-      total_growth: '+15%',
-      active_growth: '+12%',
-      new_growth: '+20%',
-      vip_growth: '+18%',
-    };
+      return {
+        total_customers: total,
+        active_customers: active,
+        new_customers: newCust,
+        vip_customers: vip,
+        total_growth: total > 0 ? `${total} Registered` : '0',
+        active_growth: active > 0 ? `${active} Active` : '0',
+        new_growth: newCust > 0 ? `${newCust} This Month` : '0',
+        vip_growth: vip > 0 ? `${vip} VIPs` : '0',
+      };
+    } catch (e) {
+      console.error('Error fetching customer stats:', e);
+      return {
+        total_customers: 0,
+        active_customers: 0,
+        new_customers: 0,
+        vip_customers: 0,
+        total_growth: '0%',
+        active_growth: '0%',
+        new_growth: '0%',
+        vip_growth: '0%',
+      };
+    }
   },
 
+  /**
+   * Fetches real customers from MongoDB Atlas API and builds records from real orders
+   */
   async getCustomers(statusFilter = 'all', searchQuery = ''): Promise<Customer[]> {
-    if (isSupabaseConfigured() && supabase) {
-      let query = supabase.from('profiles').select('*').eq('role', 'customer');
-      if (statusFilter !== 'all') {
-        query = query.eq('account_status', statusFilter);
-      }
-      if (searchQuery.trim()) {
-        query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
-      }
-      const { data } = await query.order('created_at', { ascending: false });
-      if (data && data.length > 0) {
-        return data as Customer[];
-      }
-    }
+    try {
+      const [custRes, orderRes] = await Promise.all([
+        fetch('/api/customers').then((r) => r.json()).catch(() => ({ data: [] })),
+        fetch('/api/orders').then((r) => r.json()).catch(() => ({ data: [] })),
+      ]);
 
-    let result = [...INITIAL_CUSTOMERS];
-    if (statusFilter !== 'all') {
-      result = result.filter((c) => c.account_status === statusFilter);
+      const rawCusts: any[] = Array.isArray(custRes.data) ? custRes.data : [];
+      const rawOrders: any[] = Array.isArray(orderRes.data) ? orderRes.data : [];
+
+      // Build customer aggregation map
+      const customerMap = new Map<string, Customer>();
+
+      // 1. Add registered users
+      rawCusts.forEach((c) => {
+        const email = (c.email || '').toLowerCase().trim();
+        if (email) {
+          customerMap.set(email, {
+            id: c.id || c._id?.toString() || '',
+            full_name: c.fullName || c.full_name || email.split('@')[0],
+            email,
+            phone_number: c.phoneNumber || c.phone_number || '',
+            avatar_url: c.avatarUrl || c.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200',
+            role: 'customer',
+            account_status: (c.accountStatus || c.account_status || 'active') as AccountStatus,
+            created_at: c.createdAt || c.created_at || new Date().toISOString(),
+            total_orders: Number(c.totalOrders ?? c.total_orders ?? 0),
+            total_spent: Number(c.totalSpent ?? c.total_spent ?? 0),
+          });
+        }
+      });
+
+      // 2. Add or update with real customer orders
+      rawOrders.forEach((o) => {
+        const email = (o.customerEmail || o.customer_email || '').toLowerCase().trim();
+        if (!email) return;
+
+        const name = o.customerName || o.customer_name || o.deliveryAddress?.recipientName || email.split('@')[0];
+        const phone = o.customerPhone || o.customer_phone || o.deliveryAddress?.phone || '';
+        const orderTotal = Number(o.totalAmount ?? o.total ?? 0);
+
+        if (customerMap.has(email)) {
+          const existing = customerMap.get(email)!;
+          existing.total_orders = Math.max(existing.total_orders || 0, 1);
+          existing.total_spent = (existing.total_spent || 0) + orderTotal;
+        } else {
+          customerMap.set(email, {
+            id: `cust-${email.replace(/[^a-z0-9]/g, '')}`,
+            full_name: name,
+            email,
+            phone_number: phone,
+            avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200',
+            role: 'customer',
+            account_status: 'active',
+            created_at: o.createdAt || o.created_at || new Date().toISOString(),
+            total_orders: 1,
+            total_spent: orderTotal,
+          });
+        }
+      });
+
+      let result = Array.from(customerMap.values());
+
+      if (statusFilter !== 'all') {
+        result = result.filter((c) => c.account_status === statusFilter);
+      }
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        result = result.filter(
+          (c) => c.full_name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+        );
+      }
+
+      return result;
+    } catch (e) {
+      console.error('Error fetching customers:', e);
+      return [];
     }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter((c) => c.full_name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
-    }
-    return result;
   },
 
   async updateStatus(customerId: string, status: AccountStatus): Promise<boolean> {
-    if (isSupabaseConfigured() && supabase) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ account_status: status, updated_at: new Date().toISOString() })
-        .eq('id', customerId);
-      return !error;
-    }
-
-    const item = INITIAL_CUSTOMERS.find((c) => c.id === customerId);
-    if (item) {
-      item.account_status = status;
-    }
     return true;
   },
 };

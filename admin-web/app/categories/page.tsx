@@ -165,7 +165,9 @@ export default function CategoriesPage() {
         item_count: 0,
       });
 
-      setCategories((prev) => [created, ...prev]);
+      if (created) {
+        setCategories((prev) => [created, ...prev]);
+      }
     }
 
     setIsModalOpen(false);

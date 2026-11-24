@@ -8,7 +8,6 @@ import {
   ShoppingCart,
   Users,
   Coins,
-  PlusCircle,
   FileText,
   Calendar,
   Sparkles,
@@ -23,28 +22,29 @@ import TopSellingProducts from '../../components/TopSellingProducts';
 import { AdminDashboardService } from '../../services/adminDashboard.service';
 import { AdminAuthService } from '../../services/adminAuth.service';
 import { formatNaira } from '../../lib/utils';
-import { DashboardStats, SalesDataPoint, Order, Product } from '../../types';
+import { DashboardStats, SalesDataPoint, Order, Product, AdminProfile } from '../../types';
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [admin, setAdmin] = useState<AdminProfile | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [salesData, setSalesData] = useState<SalesDataPoint[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [topProducts, setTopProducts] = useState<Array<Product & { growth?: string }>>([]);
   const [chartPeriod, setChartPeriod] = useState<7 | 30 | 90>(7);
-  const [dateRange, setDateRange] = useState('Last 30 Days');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [dateRange, setDateRange] = useState('Last 7 Days');
 
   useEffect(() => {
     checkAuthAndLoad();
   }, []);
 
   const checkAuthAndLoad = async () => {
-    const admin = await AdminAuthService.getCurrentAdmin();
-    if (!admin) {
+    const currentAdmin = await AdminAuthService.getCurrentAdmin();
+    if (!currentAdmin) {
       router.push('/admin-login');
       return;
     }
+    setAdmin(currentAdmin);
     loadData(7);
   };
 
@@ -68,10 +68,8 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen bg-[#F8F6FD]">
-      {/* Sidebar matching Reference Image 2 */}
       <AdminSidebar />
 
-      {/* Main Content Pane */}
       <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader />
 
@@ -80,11 +78,11 @@ export default function DashboardPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-[#171428] tracking-tight flex items-center gap-2">
-                <span>Welcome back, Admin!</span>
+                <span>Welcome back, {admin?.full_name ? admin.full_name.split(' ')[0] : 'Admin'}!</span>
                 <span className="text-2xl">👋</span>
               </h1>
               <p className="text-sm text-[#77738A] mt-1 font-medium">
-                Here's what's happening with your store today.
+                Live dashboard connected to MongoDB Atlas & Cloudinary.
               </p>
             </div>
 
@@ -93,47 +91,52 @@ export default function DashboardPage() {
               <Calendar size={15} className="text-[#6515D5]" />
               <select
                 value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDateRange(val);
+                  if (val === 'Last 7 Days') handlePeriodChange(7);
+                  else if (val === 'Last 30 Days') handlePeriodChange(30);
+                  else if (val === 'Last 90 Days') handlePeriodChange(90);
+                }}
                 className="bg-transparent border-none focus:outline-none cursor-pointer"
               >
                 <option value="Last 7 Days">Last 7 Days</option>
                 <option value="Last 30 Days">Last 30 Days</option>
                 <option value="Last 90 Days">Last 90 Days</option>
-                <option value="This Year">This Year</option>
               </select>
             </div>
           </div>
 
-          {/* 4 Overview Metric Cards matching Reference Image 2 */}
+          {/* 4 Overview Metric Cards with Real Live Data */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <MetricCard
               title="Total Products"
-              value={stats?.total_products?.toLocaleString() || '124'}
-              trend={stats?.products_growth || '↑ +12%'}
+              value={stats ? stats.total_products.toLocaleString() : '0'}
+              trend={stats?.products_growth || 'Active'}
               variant="purple"
               icon={<ShoppingBag size={24} />}
             />
 
             <MetricCard
               title="Total Orders"
-              value={stats?.total_orders?.toLocaleString() || '856'}
-              trend={stats?.orders_growth || '↑ +18%'}
+              value={stats ? stats.total_orders.toLocaleString() : '0'}
+              trend={stats?.orders_growth || 'Total'}
               variant="blue"
               icon={<ShoppingCart size={24} />}
             />
 
             <MetricCard
               title="Total Customers"
-              value={stats?.total_customers?.toLocaleString() || '3,240'}
-              trend={stats?.customers_growth || '↑ +15%'}
+              value={stats ? stats.total_customers.toLocaleString() : '0'}
+              trend={stats?.customers_growth || 'Registered'}
               variant="green"
               icon={<Users size={24} />}
             />
 
             <MetricCard
               title="Total Sales"
-              value={formatNaira(stats?.total_sales || 1245000)}
-              trend={stats?.sales_growth || '↑ +22%'}
+              value={formatNaira(stats?.total_sales ?? 0)}
+              trend={stats?.sales_growth || 'Live'}
               variant="orange"
               icon={<Coins size={24} />}
             />
@@ -150,9 +153,8 @@ export default function DashboardPage() {
               />
             </div>
 
-            {/* Quick Actions & Boost Promo (4 Cols) */}
+            {/* Quick Actions (4 Cols) */}
             <div className="lg:col-span-4 space-y-6">
-              {/* Quick Actions Card */}
               <div className="bg-white rounded-2xl p-6 border border-[#EAE6F3] shadow-sm">
                 <div className="flex items-center space-x-2 text-sm font-black text-[#171428] mb-4">
                   <Sparkles size={18} className="text-[#6515D5]" />
@@ -187,7 +189,7 @@ export default function DashboardPage() {
                     <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#16A34A] shadow-sm mb-2 group-hover:scale-105 transition">
                       <Users size={18} />
                     </div>
-                    <span className="text-xs font-bold text-[#171428]">Manage Customers</span>
+                    <span className="text-xs font-bold text-[#171428]">Customers</span>
                   </Link>
 
                   <Link
@@ -197,27 +199,26 @@ export default function DashboardPage() {
                     <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#D97706] shadow-sm mb-2 group-hover:scale-105 transition">
                       <FileText size={18} />
                     </div>
-                    <span className="text-xs font-bold text-[#171428]">View Reports</span>
+                    <span className="text-xs font-bold text-[#171428]">Analytics</span>
                   </Link>
                 </div>
               </div>
 
-              {/* Boost Your Sales Promo Banner */}
+              {/* Status Banner */}
               <div className="bg-gradient-to-tr from-[#6515D5] to-[#8B5CF6] rounded-2xl p-6 text-white shadow-lg shadow-purple-600/20 relative overflow-hidden">
                 <div className="relative z-10 max-w-xs">
-                  <h4 className="text-lg font-black tracking-tight">Boost Your Sales</h4>
+                  <h4 className="text-lg font-black tracking-tight">Database Connected</h4>
                   <p className="text-xs text-purple-100/90 mt-1 mb-4 leading-relaxed">
-                    Offer amazing deals and attract more customers to your store.
+                    MongoDB Atlas & Cloudinary are connected with real-time sync to the Expo mobile app.
                   </p>
-                  <button
-                    onClick={() => router.push('/products')}
-                    className="py-2.5 px-4 rounded-xl bg-[#FFB21A] hover:bg-[#E69E10] text-[#171428] text-xs font-bold shadow-md transition"
+                  <Link
+                    href="/products"
+                    className="inline-block py-2.5 px-4 rounded-xl bg-[#FFB21A] hover:bg-[#E69E10] text-[#171428] text-xs font-bold shadow-md transition"
                   >
-                    Create Promo →
-                  </button>
+                    Manage Products →
+                  </Link>
                 </div>
 
-                {/* Decorative Cart Graphic */}
                 <div className="absolute -bottom-2 -right-4 w-28 h-28 opacity-25 pointer-events-none">
                   <ShoppingCart size={110} />
                 </div>

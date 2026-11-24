@@ -1,5 +1,4 @@
 import { Order, OrderStatus, AdminStats } from '../types';
-import { MOCK_ORDERS } from '../data/mock-orders';
 import { StorageService, StorageKeys } from './storage.service';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { ProductService } from './product.service';
@@ -85,20 +84,16 @@ function mapOrder(o: any): Order {
 
 export const OrderService = {
   /**
-   * Initialize orders with mock data if not seeded
+   * Initialize orders cache
    */
   async initializeOrders(): Promise<Order[]> {
     const existing = await StorageService.getItem<Order[]>(StorageKeys.ORDERS, []);
-    if (!existing || existing.length === 0 || !existing.some((o) => o.id === 'ord-001')) {
-      await StorageService.setItem(StorageKeys.ORDERS, MOCK_ORDERS);
-      return MOCK_ORDERS;
-    }
-    return existing;
+    return existing || [];
   },
 
   /**
    * Get all orders (for Admin) or filtered by customerId (for Customer)
-   * Prioritizes live cloud backend (Vercel + MongoDB Atlas), then Supabase, then cached storage
+   * Prioritizes live cloud backend (Vercel + MongoDB Atlas), then cached storage
    */
   async getOrders(customerId?: string): Promise<Order[]> {
     // 1. Try Live Cloud API (Vercel + MongoDB Atlas)
@@ -114,7 +109,7 @@ export const OrderService = {
       if (res.ok) {
         const json = await res.json();
         const raw = json.data || json;
-        if (Array.isArray(raw) && raw.length > 0) {
+        if (Array.isArray(raw)) {
           const mapped = raw.map(mapOrder);
           await StorageService.setItem(StorageKeys.ORDERS, mapped);
           if (customerId) {
@@ -157,7 +152,7 @@ export const OrderService = {
       }
     }
 
-    // 3. Fallback to Local Storage / Seeded Mocks
+    // 3. Fallback to Local Storage cache
     const orders = await this.initializeOrders();
     if (customerId) {
       return orders.filter((o) => o.customer_id === customerId);
@@ -370,7 +365,7 @@ export const OrderService = {
   },
 
   /**
-   * Admin: Compute sales metrics and revenue summaries
+   * Admin: Compute sales metrics and revenue summaries directly from real orders
    */
   async getAdminStats(): Promise<AdminStats> {
     const orders = await this.getOrders();
@@ -379,23 +374,42 @@ export const OrderService = {
     const totalOrders = orders.length;
     const pendingOrders = orders.filter((o) => o.order_status === 'pending' || o.order_status === 'processing').length;
     const totalSales = orders.reduce((sum, o) => sum + (o.payment_status === 'paid' ? o.total : 0), 0);
-    const uniqueCustomers = new Set(orders.map((o) => o.customer_email)).size || 1;
+    const uniqueCustomers = new Set(orders.map((o) => o.customer_email).filter(Boolean)).size;
 
-    const monthlyRevenue = [
-      { month: 'Jun', amount: 180000 },
-      { month: 'Jul', amount: 240000 },
-      { month: 'Aug', amount: 310000 },
-      { month: 'Sep', amount: 290000 },
-      { month: 'Oct', amount: 420000 },
-      { month: 'Nov', amount: totalSales > 0 ? totalSales : 390000 },
-    ];
+    // Build real 6-month revenue from real orders
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentMonthIdx = new Date().getMonth();
+    const last6Months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date();
+      d.setMonth(currentMonthIdx - 5 + i);
+      return {
+        month: monthNames[d.getMonth()],
+        year: d.getFullYear(),
+        monthNum: d.getMonth(),
+        amount: 0,
+      };
+    });
+
+    for (const order of orders) {
+      if (order.payment_status === 'paid' && order.created_at) {
+        const orderDate = new Date(order.created_at);
+        const match = last6Months.find(
+          (m) => m.monthNum === orderDate.getMonth() && m.year === orderDate.getFullYear()
+        );
+        if (match) {
+          match.amount += order.total;
+        }
+      }
+    }
+
+    const monthlyRevenue = last6Months.map(({ month, amount }) => ({ month, amount }));
 
     return {
       total_products: products.length,
       total_orders: totalOrders,
       pending_orders: pendingOrders,
       total_customers: uniqueCustomers,
-      total_sales: totalSales > 0 ? totalSales : 35000,
+      total_sales: totalSales,
       monthly_revenue: monthlyRevenue,
     };
   },

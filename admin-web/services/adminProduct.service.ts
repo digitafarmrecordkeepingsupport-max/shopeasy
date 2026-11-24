@@ -1,343 +1,214 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { Product, Category } from '../types';
 
 export const AdminProductService = {
+  /**
+   * Fetch all real products from MongoDB Atlas
+   */
   async getProducts(): Promise<Product[]> {
-    if (isSupabaseConfigured() && supabase) {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (!error && data) {
-        return data as Product[];
+    try {
+      const res = await fetch('/api/products');
+      if (res.ok) {
+        const json = await res.json();
+        const raw: any[] = Array.isArray(json.data) ? json.data : [];
+        return raw.map((p) => ({
+          id: p.id || p._id?.toString() || '',
+          name: p.name || 'Unnamed Product',
+          slug: p.slug || '',
+          description: p.description || '',
+          category_id: p.categoryId || p.category_id || '',
+          category_name: p.categoryName || p.category_name || '',
+          price: Number(p.price || 0),
+          original_price: p.originalPrice ? Number(p.originalPrice) : undefined,
+          stock_quantity: Number(p.stockQuantity ?? p.stock_quantity ?? 0),
+          sku: p.sku || '',
+          image_urls: Array.isArray(p.imageUrls) ? p.imageUrls : (Array.isArray(p.image_urls) ? p.image_urls : []),
+          is_featured: Boolean(p.isFeatured ?? p.is_featured),
+          is_active: Boolean(p.isActive ?? p.is_active ?? true),
+          created_at: p.createdAt || p.created_at || new Date().toISOString(),
+        }));
       }
+    } catch (e) {
+      console.error('Error fetching admin products:', e);
     }
-
-    return [
-      {
-        id: 'prod-earbuds-03',
-        name: 'Wireless Earbuds',
-        slug: 'wireless-earbuds',
-        description: 'White wireless earbuds with active noise cancellation and charging case.',
-        category_id: 'cat-electronics',
-        category_name: 'Electronics',
-        price: 25000,
-        original_price: 32000,
-        stock_quantity: 45,
-        sku: 'SE-EBD-003',
-        image_urls: ['https://images.unsplash.com/photo-1590658268037-6bf12165a8df?q=80&w=800&auto=format&fit=crop'],
-        is_featured: true,
-        is_active: true,
-        created_at: '2025-01-01',
-      },
-      {
-        id: 'prod-watch-02',
-        name: 'Smart Watch',
-        slug: 'smart-watch',
-        description: 'Black smartwatch with AMOLED display and fitness sensors.',
-        category_id: 'cat-electronics',
-        category_name: 'Electronics',
-        price: 45000,
-        original_price: 60000,
-        stock_quantity: 28,
-        sku: 'SE-WTC-002',
-        image_urls: ['https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=800&auto=format&fit=crop'],
-        is_featured: true,
-        is_active: true,
-        created_at: '2025-01-01',
-      },
-      {
-        id: 'prod-sneakers-01',
-        name: 'Casual Sneakers',
-        slug: 'casual-sneakers',
-        description: 'Black-and-white cushioned synthetic leather sneakers.',
-        category_id: 'cat-fashion',
-        category_name: 'Fashion',
-        price: 35000,
-        original_price: 50000,
-        stock_quantity: 32,
-        sku: 'SE-SNK-001',
-        image_urls: ['https://images.unsplash.com/photo-1552346154-21d32810aba3?q=80&w=800&auto=format&fit=crop'],
-        is_featured: true,
-        is_active: true,
-        created_at: '2025-01-01',
-      },
-      {
-        id: 'prod-headphones-04',
-        name: 'Wireless Headphones',
-        slug: 'wireless-headphones',
-        description: 'Studio over-ear titanium ANC headphones.',
-        category_id: 'cat-electronics',
-        category_name: 'Electronics',
-        price: 47000,
-        original_price: 65000,
-        stock_quantity: 19,
-        sku: 'SE-HDP-004',
-        image_urls: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=800&auto=format&fit=crop'],
-        is_featured: true,
-        is_active: true,
-        created_at: '2025-01-01',
-      },
-    ];
+    return [];
   },
 
+  /**
+   * Fetch all real categories from MongoDB Atlas
+   */
   async getCategories(): Promise<Category[]> {
-    if (isSupabaseConfigured() && supabase) {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('display_order', { ascending: true });
-      if (!error && data && data.length > 0) {
-        return data as Category[];
+    try {
+      const res = await fetch('/api/categories');
+      if (res.ok) {
+        const json = await res.json();
+        const raw: any[] = Array.isArray(json.data) ? json.data : [];
+        return raw.map((c) => ({
+          id: c.id || c._id?.toString() || '',
+          name: c.name || '',
+          slug: c.slug || '',
+          description: c.description || '',
+          icon_name: c.iconName || c.icon_name || 'tag',
+          image_url: c.imageUrl || c.image_url || '',
+          color: c.color || '#F3E8FF',
+          is_active: Boolean(c.isActive ?? c.is_active ?? true),
+          item_count: Number(c.itemCount ?? c.item_count ?? 0),
+          created_at: c.createdAt || c.created_at || new Date().toISOString(),
+        }));
       }
+    } catch (e) {
+      console.error('Error fetching admin categories:', e);
     }
-
-    return [
-      {
-        id: 'cat-fashion',
-        name: 'Fashion',
-        slug: 'fashion',
-        description: 'Trendy clothing and fashion items',
-        icon_name: 'shirt',
-        image_url: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?q=80&w=400',
-        color: '#F3E8FF',
-        is_active: true,
-        item_count: 42,
-        created_at: '2025-01-01',
-      },
-      {
-        id: 'cat-electronics',
-        name: 'Electronics',
-        slug: 'electronics',
-        description: 'Latest electronics and gadgets',
-        icon_name: 'laptop',
-        image_url: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=400',
-        color: '#EDE9FE',
-        is_active: true,
-        item_count: 56,
-        created_at: '2025-01-02',
-      },
-      {
-        id: 'cat-home',
-        name: 'Home',
-        slug: 'home',
-        description: 'Home and living essentials',
-        icon_name: 'home',
-        image_url: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=400',
-        color: '#F5F3FF',
-        is_active: true,
-        item_count: 38,
-        created_at: '2025-01-03',
-      },
-      {
-        id: 'cat-beauty',
-        name: 'Beauty',
-        slug: 'beauty',
-        description: 'Beauty and personal care products',
-        icon_name: 'sparkles',
-        image_url: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?q=80&w=400',
-        color: '#FDF2F8',
-        is_active: true,
-        item_count: 28,
-        created_at: '2025-01-04',
-      },
-      {
-        id: 'cat-sports',
-        name: 'Sports',
-        slug: 'sports',
-        description: 'Sports and fitness equipment',
-        icon_name: 'football',
-        image_url: 'https://images.unsplash.com/photo-1614632537423-1e6c2e7e0aab?q=80&w=400',
-        color: '#F0FDF4',
-        is_active: true,
-        item_count: 20,
-        created_at: '2025-01-05',
-      },
-      {
-        id: 'cat-accessories',
-        name: 'Accessories',
-        slug: 'accessories',
-        description: 'Fashion accessories and more',
-        icon_name: 'bag',
-        image_url: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=400',
-        color: '#FEF3C7',
-        is_active: false,
-        item_count: 14,
-        created_at: '2025-01-06',
-      },
-      {
-        id: 'cat-books',
-        name: 'Books',
-        slug: 'books',
-        description: 'Fiction, non-fiction and educational books',
-        icon_name: 'book',
-        image_url: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=400',
-        color: '#F5F3FF',
-        is_active: true,
-        item_count: 10,
-        created_at: '2025-01-07',
-      },
-      {
-        id: 'cat-gaming',
-        name: 'Gaming',
-        slug: 'gaming',
-        description: 'Consoles, video games and accessories',
-        icon_name: 'gamepad',
-        image_url: 'https://images.unsplash.com/photo-1600080972464-8e5f35f63d08?q=80&w=400',
-        color: '#EDE9FE',
-        is_active: true,
-        item_count: 12,
-        created_at: '2025-01-08',
-      },
-      {
-        id: 'cat-jewelry',
-        name: 'Jewelry',
-        slug: 'jewelry',
-        description: 'Fine rings, necklaces and luxury timepieces',
-        icon_name: 'watch',
-        image_url: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?q=80&w=400',
-        color: '#FDF2F8',
-        is_active: true,
-        item_count: 6,
-        created_at: '2025-01-09',
-      },
-      {
-        id: 'cat-groceries',
-        name: 'Groceries',
-        slug: 'groceries',
-        description: 'Pantry essentials, beverages and fresh food',
-        icon_name: 'shopping-cart',
-        image_url: 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=400',
-        color: '#F0FDF4',
-        is_active: true,
-        item_count: 10,
-        created_at: '2025-01-10',
-      },
-      {
-        id: 'cat-toys',
-        name: 'Toys',
-        slug: 'toys',
-        description: 'Kids toys, board games and collectibles',
-        icon_name: 'smile',
-        image_url: 'https://images.unsplash.com/photo-1558060370-d644479cb6f7?q=80&w=400',
-        color: '#FEF3C7',
-        is_active: true,
-        item_count: 8,
-        created_at: '2025-01-11',
-      },
-      {
-        id: 'cat-automotive',
-        name: 'Automotive',
-        slug: 'automotive',
-        description: 'Car care products, gadgets and spare parts',
-        icon_name: 'truck',
-        image_url: 'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?q=80&w=400',
-        color: '#F1F5F9',
-        is_active: false,
-        item_count: 4,
-        created_at: '2025-01-12',
-      },
-    ];
+    return [];
   },
 
-  async createCategory(categoryData: Partial<Category>): Promise<Category> {
-    const slug = categoryData.slug || categoryData.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || 'category';
-    const newCat: Category = {
-      id: 'cat-' + Math.random().toString(36).substring(2, 9),
-      name: categoryData.name || '',
-      slug,
-      description: categoryData.description || '',
-      icon_name: categoryData.icon_name || 'tag',
-      image_url: categoryData.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=400',
-      color: categoryData.color || '#F3E8FF',
-      is_active: categoryData.is_active ?? true,
-      item_count: categoryData.item_count || 0,
-      created_at: new Date().toISOString(),
-    };
-
-    if (isSupabaseConfigured() && supabase) {
-      const { data, error } = await supabase.from('categories').insert([newCat]).select().single();
-      if (!error && data) {
-        return data as Category;
+  /**
+   * Create a new category in MongoDB Atlas
+   */
+  async createCategory(categoryData: Partial<Category>): Promise<Category | null> {
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: categoryData.name,
+          slug: categoryData.slug,
+          description: categoryData.description,
+          iconName: categoryData.icon_name,
+          imageUrl: categoryData.image_url,
+          color: categoryData.color,
+          isActive: categoryData.is_active ?? true,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data;
       }
+    } catch (e) {
+      console.error('Error creating category:', e);
     }
-
-    return newCat;
+    return null;
   },
 
+  /**
+   * Update category in MongoDB Atlas
+   */
   async updateCategory(id: string, updates: Partial<Category>): Promise<boolean> {
-    if (isSupabaseConfigured() && supabase) {
-      const { error } = await supabase
-        .from('categories')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', id);
-      return !error;
+    try {
+      const res = await fetch(`/api/categories/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(updates.name && { name: updates.name }),
+          ...(updates.slug && { slug: updates.slug }),
+          ...(updates.description && { description: updates.description }),
+          ...(updates.icon_name && { iconName: updates.icon_name }),
+          ...(updates.image_url && { imageUrl: updates.image_url }),
+          ...(updates.color && { color: updates.color }),
+          ...(updates.is_active !== undefined && { isActive: updates.is_active }),
+        }),
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('Error updating category:', e);
+      return false;
     }
-    return true;
   },
 
+  /**
+   * Delete category in MongoDB Atlas
+   */
   async deleteCategory(id: string): Promise<boolean> {
-    if (isSupabaseConfigured() && supabase) {
-      const { error } = await supabase.from('categories').delete().eq('id', id);
-      return !error;
+    try {
+      const res = await fetch(`/api/categories/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('Error deleting category:', e);
+      return false;
     }
-    return true;
   },
 
-  async createProduct(productData: Partial<Product>): Promise<Product> {
-    const slug = productData.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || 'product';
-    const newProd: Product = {
-      id: 'prod-' + Math.random().toString(36).substring(2, 9),
-      name: productData.name || '',
-      slug,
-      description: productData.description || '',
-      category_id: productData.category_id || 'cat-fashion',
-      category_name: productData.category_name,
-      price: productData.price || 0,
-      original_price: productData.original_price,
-      stock_quantity: productData.stock_quantity || 0,
-      sku: productData.sku || `SE-${Math.floor(1000 + Math.random() * 9000)}`,
-      image_urls: productData.image_urls || ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=800'],
-      is_featured: productData.is_featured || false,
-      is_active: productData.is_active ?? true,
-      created_at: new Date().toISOString(),
-    };
-
-    if (isSupabaseConfigured() && supabase) {
-      const { data, error } = await supabase.from('products').insert([newProd]).select().single();
-      if (!error && data) {
-        return data as Product;
+  /**
+   * Create product in MongoDB Atlas
+   */
+  async createProduct(productData: Partial<Product>): Promise<Product | null> {
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: productData.name,
+          description: productData.description,
+          categoryId: productData.category_id,
+          categoryName: productData.category_name,
+          price: productData.price,
+          originalPrice: productData.original_price,
+          stockQuantity: productData.stock_quantity,
+          sku: productData.sku,
+          imageUrls: productData.image_urls,
+          isFeatured: productData.is_featured,
+          isActive: productData.is_active ?? true,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data;
       }
+    } catch (e) {
+      console.error('Error creating product:', e);
     }
-
-    return newProd;
+    return null;
   },
 
+  /**
+   * Update product in MongoDB Atlas
+   */
   async updateProduct(id: string, updates: Partial<Product>): Promise<boolean> {
-    if (isSupabaseConfigured() && supabase) {
-      const { error } = await supabase
-        .from('products')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', id);
-      return !error;
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(updates.name && { name: updates.name }),
+          ...(updates.description && { description: updates.description }),
+          ...(updates.category_id && { categoryId: updates.category_id }),
+          ...(updates.category_name && { categoryName: updates.category_name }),
+          ...(updates.price !== undefined && { price: updates.price }),
+          ...(updates.original_price !== undefined && { originalPrice: updates.original_price }),
+          ...(updates.stock_quantity !== undefined && { stockQuantity: updates.stock_quantity }),
+          ...(updates.sku && { sku: updates.sku }),
+          ...(updates.image_urls && { imageUrls: updates.image_urls }),
+          ...(updates.is_featured !== undefined && { isFeatured: updates.is_featured }),
+          ...(updates.is_active !== undefined && { isActive: updates.is_active }),
+        }),
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('Error updating product:', e);
+      return false;
     }
-    return true;
   },
 
+  /**
+   * Delete / archive product in MongoDB Atlas
+   */
   async deleteProduct(id: string): Promise<boolean> {
-    if (isSupabaseConfigured() && supabase) {
-      // Soft-delete by marking inactive to preserve historical orders
-      const { error } = await supabase
-        .from('products')
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq('id', id);
-      return !error;
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('Error deleting product:', e);
+      return false;
     }
-    return true;
   },
 
+  /**
+   * Upload image to Cloudinary via backend API
+   */
   async uploadProductImage(file: File): Promise<string | null> {
-    // 1. Try Cloudinary via Next.js API
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -355,26 +226,8 @@ export const AdminProductService = {
         }
       }
     } catch (e) {
-      console.warn('Cloudinary upload via /api/upload error, checking fallbacks:', e);
+      console.error('Cloudinary upload error:', e);
     }
-
-    // 2. Supabase Storage Fallback
-    if (isSupabaseConfigured() && supabase) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-      const filePath = `products/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(filePath, file);
-
-      if (!uploadError) {
-        const { data } = supabase.storage.from('product-images').getPublicUrl(filePath);
-        return data.publicUrl;
-      }
-    }
-
-    // 3. Fallback placeholder
-    return 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=800';
+    return null;
   },
 };

@@ -119,7 +119,9 @@ export default function ProductsPage() {
       );
     } else {
       const created = await AdminProductService.createProduct(payload);
-      setProducts([created, ...products]);
+      if (created) {
+        setProducts([created, ...products]);
+      }
     }
 
     setIsModalOpen(false);

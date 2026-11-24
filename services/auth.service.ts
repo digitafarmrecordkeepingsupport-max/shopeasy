@@ -2,21 +2,11 @@ import { UserProfile, UserRole } from '../types';
 import { StorageService, StorageKeys } from './storage.service';
 import { supabase, isSupabaseConfigured } from './supabase';
 
-const DEFAULT_CUSTOMER: UserProfile = {
-  id: 'usr-customer-jane',
-  email: 'jane.doe@gmail.com',
-  full_name: 'Jane Doe',
+const ADMIN_PROFILE: UserProfile = {
+  id: 'usr-admin-qazeem',
+  email: 'qazeembasitoladimeji@gmsail.com',
+  full_name: 'Qazeem Basit Oladimeji',
   phone_number: '+234 801 234 5678',
-  avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop',
-  role: 'customer',
-  created_at: new Date().toISOString(),
-};
-
-const DEFAULT_ADMIN: UserProfile = {
-  id: 'usr-admin-owner',
-  email: 'admin@shopeasy.com',
-  full_name: 'Store Owner',
-  phone_number: '+234 802 987 6543',
   avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop',
   role: 'admin',
   created_at: new Date().toISOString(),
@@ -41,7 +31,7 @@ export const AuthService = {
    * Get current authenticated user session
    */
   async getCurrentUser(): Promise<UserProfile | null> {
-    return await StorageService.getItem<UserProfile | null>(StorageKeys.USER_SESSION, DEFAULT_CUSTOMER);
+    return await StorageService.getItem<UserProfile | null>(StorageKeys.USER_SESSION, null);
   },
 
   /**
@@ -51,10 +41,22 @@ export const AuthService = {
     const trimmed = email.toLowerCase().trim();
 
     // Check if logging in as admin
-    const role: UserRole = trimmed.includes('admin') ? 'admin' : 'customer';
-    const profile: UserProfile = role === 'admin'
-      ? { ...DEFAULT_ADMIN, email: trimmed }
-      : { ...DEFAULT_CUSTOMER, email: trimmed };
+    const isAdmin =
+      trimmed === 'qazeembasitoladimeji@gmsail.com' ||
+      trimmed === 'qazeembasitoladimeji@gmail.com' ||
+      trimmed.includes('admin');
+
+    const role: UserRole = isAdmin ? 'admin' : 'customer';
+
+    const profile: UserProfile = isAdmin
+      ? { ...ADMIN_PROFILE, email: trimmed }
+      : {
+          id: 'usr-' + Date.now().toString(36),
+          email: trimmed,
+          full_name: trimmed.split('@')[0],
+          role: 'customer',
+          created_at: new Date().toISOString(),
+        };
 
     if (isSupabaseConfigured() && supabase) {
       try {
@@ -67,7 +69,7 @@ export const AuthService = {
           profile.email = data.user.email || profile.email;
         }
       } catch (e) {
-        console.warn('Supabase login warning, continuing in demo mode:', e);
+        console.warn('Supabase login warning, continuing locally:', e);
       }
     }
 
@@ -84,13 +86,18 @@ export const AuthService = {
     phoneNumber?: string;
     password?: string;
   }): Promise<UserProfile> {
+    const trimmedEmail = data.email.toLowerCase().trim();
+    const isAdmin =
+      trimmedEmail === 'qazeembasitoladimeji@gmsail.com' ||
+      trimmedEmail === 'qazeembasitoladimeji@gmail.com';
+
     const profile: UserProfile = {
       id: 'usr-' + Date.now().toString(36),
       full_name: data.fullName,
-      email: data.email.toLowerCase().trim(),
+      email: trimmedEmail,
       phone_number: data.phoneNumber,
       avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop',
-      role: data.email.toLowerCase().includes('admin') ? 'admin' : 'customer',
+      role: isAdmin ? 'admin' : 'customer',
       created_at: new Date().toISOString(),
     };
 
@@ -117,10 +124,23 @@ export const AuthService = {
   },
 
   /**
-   * Switch roles between Customer and Store Owner (admin) for demo testing
+   * Switch roles between Customer and Admin
    */
   async switchRole(role: UserRole): Promise<UserProfile> {
-    const target = role === 'admin' ? DEFAULT_ADMIN : DEFAULT_CUSTOMER;
+    const current = await this.getCurrentUser();
+    const target: UserProfile =
+      role === 'admin'
+        ? ADMIN_PROFILE
+        : current && current.role === 'customer'
+        ? current
+        : {
+            id: 'usr-customer-user',
+            email: 'customer@shopeasy.com',
+            full_name: 'Customer User',
+            role: 'customer',
+            created_at: new Date().toISOString(),
+          };
+
     await StorageService.setItem(StorageKeys.USER_SESSION, target);
     return target;
   },
@@ -131,7 +151,7 @@ export const AuthService = {
   async updateProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
     const current = await this.getCurrentUser();
     const updated: UserProfile = {
-      ...(current || DEFAULT_CUSTOMER),
+      ...(current || ADMIN_PROFILE),
       ...updates,
     };
     await StorageService.setItem(StorageKeys.USER_SESSION, updated);

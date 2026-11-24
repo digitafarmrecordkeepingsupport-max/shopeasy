@@ -1,6 +1,4 @@
 import { Product, Category } from '../types';
-import { MOCK_PRODUCTS } from '../data/mock-products';
-import { MOCK_CATEGORIES } from '../data/mock-categories';
 import { StorageService, StorageKeys } from './storage.service';
 import { supabase, isSupabaseConfigured } from './supabase';
 
@@ -67,20 +65,16 @@ function mapCategory(c: any): Category {
 
 export const ProductService = {
   /**
-   * Initializes local storage with mock products if not already seeded
+   * Initializes local storage cache
    */
   async initializeProducts(): Promise<Product[]> {
     const existing = await StorageService.getItem<Product[]>(StorageKeys.PRODUCTS, []);
-    if (!existing || existing.length === 0) {
-      await StorageService.setItem(StorageKeys.PRODUCTS, MOCK_PRODUCTS);
-      return MOCK_PRODUCTS;
-    }
-    return existing;
+    return existing || [];
   },
 
   /**
    * Get all active products for the customer catalogue
-   * Prioritizes live cloud backend (Vercel + MongoDB Atlas), then Supabase, then cached storage
+   * Prioritizes live cloud backend (Vercel + MongoDB Atlas), then cached storage
    */
   async getProducts(): Promise<Product[]> {
     // 1. Try Live Cloud API (Vercel + MongoDB Atlas)
@@ -91,14 +85,14 @@ export const ProductService = {
       if (res.ok) {
         const json = await res.json();
         const raw = json.data || json;
-        if (Array.isArray(raw) && raw.length > 0) {
+        if (Array.isArray(raw)) {
           const mapped = raw.map(mapProduct).filter((p) => p.is_active);
           await StorageService.setItem(StorageKeys.PRODUCTS, mapped);
           return mapped;
         }
       }
     } catch (apiErr) {
-      console.log('Live products API unreachable, checking alternatives:', apiErr);
+      console.log('Live products API unreachable, checking cached storage:', apiErr);
     }
 
     // 2. Try Supabase fallback
@@ -119,7 +113,7 @@ export const ProductService = {
       }
     }
 
-    // 3. Fallback to Local Storage / Seeded Mocks
+    // 3. Fallback to Local Storage cache
     return await this.initializeProducts();
   },
 
@@ -134,7 +128,7 @@ export const ProductService = {
       if (res.ok) {
         const json = await res.json();
         const raw = json.data || json;
-        if (Array.isArray(raw) && raw.length > 0) {
+        if (Array.isArray(raw)) {
           const mapped = raw.map(mapProduct);
           await StorageService.setItem(StorageKeys.PRODUCTS, mapped);
           return mapped;
@@ -242,7 +236,6 @@ export const ProductService = {
 
   /**
    * Admin: Create a new product
-   * Pushes to live cloud API, updates MongoDB Atlas, and synchronizes local storage
    */
   async createProduct(newProduct: Omit<Product, 'id' | 'created_at'>): Promise<Product> {
     const localId = 'prod-' + Date.now().toString(36);
@@ -416,7 +409,7 @@ export const ProductService = {
 
   /**
    * Categories
-   * Fetches from live MongoDB backend (Vercel) first, then Supabase, then cached mocks
+   * Fetches from live MongoDB backend (Vercel) first, then cached storage
    */
   async getCategories(): Promise<Category[]> {
     // 1. Try Live Cloud API (Vercel + MongoDB Atlas)
@@ -427,7 +420,7 @@ export const ProductService = {
       if (res.ok) {
         const json = await res.json();
         const raw = json.data || json;
-        if (Array.isArray(raw) && raw.length > 0) {
+        if (Array.isArray(raw)) {
           const mapped = raw.map(mapCategory);
           await StorageService.setItem(StorageKeys.CATEGORIES, mapped);
           return mapped;
@@ -454,12 +447,8 @@ export const ProductService = {
       }
     }
 
-    // 3. Fallback to Local Storage / Seeded Mocks
+    // 3. Fallback to Local Storage cache
     const existing = await StorageService.getItem<Category[]>(StorageKeys.CATEGORIES, []);
-    if (!existing || existing.length === 0) {
-      await StorageService.setItem(StorageKeys.CATEGORIES, MOCK_CATEGORIES);
-      return MOCK_CATEGORIES;
-    }
-    return existing;
+    return existing || [];
   },
 };

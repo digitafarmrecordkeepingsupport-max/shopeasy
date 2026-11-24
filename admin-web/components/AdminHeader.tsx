@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Bell, ChevronDown, User, LogOut } from 'lucide-react';
 import { AdminAuthService } from '../services/adminAuth.service';
+import { AdminProfile } from '../types';
 
 interface AdminHeaderProps {
   searchPlaceholder?: string;
@@ -17,6 +18,11 @@ export default function AdminHeader({
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+  const [admin, setAdmin] = useState<AdminProfile | null>(null);
+
+  useEffect(() => {
+    AdminAuthService.getCurrentAdmin().then(setAdmin);
+  }, []);
 
   const handleLogout = async () => {
     await AdminAuthService.logout();
@@ -25,7 +31,7 @@ export default function AdminHeader({
 
   return (
     <header className="h-20 bg-white border-b border-[#EAE6F3] px-8 flex items-center justify-between sticky top-0 z-30">
-      {/* Search Bar matching Image 2 */}
+      {/* Search Bar */}
       <div className="relative w-96">
         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#77738A]">
           <Search size={18} />
@@ -42,43 +48,30 @@ export default function AdminHeader({
         />
       </div>
 
-      {/* Right Controls: Notifications + Admin Profile */}
+      {/* Right Controls: Admin Profile */}
       <div className="flex items-center space-x-6">
-        {/* Notification Bell */}
-        <button
-          onClick={() => alert('Notifications (3):\n1. New customer order #SE20251125-108 received!\n2. Low stock alert for Wireless Headphones Pro.\n3. Daily settlement ready for Paystack.')}
-          className="relative p-2 text-[#171428] hover:bg-[#F7F5FC] rounded-full transition"
-        >
-          <Bell size={21} />
-          <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-[#EF4444] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-            3
-          </span>
-        </button>
-
         {/* Admin Profile */}
         <div className="relative">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="flex items-center space-x-3 p-1.5 pl-2 pr-3 rounded-full hover:bg-[#F7F5FC] transition border border-transparent hover:border-[#EAE6F3]"
           >
-            <div className="w-9 h-9 rounded-full bg-purple-100 overflow-hidden border border-[#EAE6F3]">
-              <img
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop"
-                alt="Admin"
-                className="w-full h-full object-cover"
-              />
+            <div className="w-9 h-9 rounded-full bg-purple-100 overflow-hidden border border-[#EAE6F3] flex items-center justify-center text-[#6515D5] font-black text-xs">
+              {admin?.full_name ? admin.full_name.charAt(0) : 'A'}
             </div>
             <div className="flex items-center space-x-1.5 text-sm font-bold text-[#171428]">
-              <span>Admin</span>
+              <span>{admin?.full_name || 'Admin'}</span>
               <ChevronDown size={15} className="text-[#77738A]" />
             </div>
           </button>
 
           {dropdownOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-[#EAE6F3] py-2 z-50">
+            <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#EAE6F3] py-2 z-50">
               <div className="px-4 py-2 border-b border-gray-100">
-                <div className="text-xs text-[#77738A]">Signed in as</div>
-                <div className="text-sm font-bold text-[#171428] truncate">admin@shopeasy.com</div>
+                <div className="text-[11px] text-[#77738A]">Signed in as</div>
+                <div className="text-xs font-bold text-[#171428] truncate">
+                  {admin?.email || 'qazeembasitoladimeji@gmsail.com'}
+                </div>
               </div>
               <button
                 onClick={() => {

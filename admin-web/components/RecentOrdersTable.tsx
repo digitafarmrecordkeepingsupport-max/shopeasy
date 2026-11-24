@@ -48,39 +48,45 @@ export default function RecentOrdersTable({
         </Link>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b border-[#F0EBF8] text-[11px] font-bold uppercase tracking-wider text-[#77738A]">
-              <th className="pb-3 font-semibold">Order #</th>
-              <th className="pb-3 font-semibold">Customer</th>
-              <th className="pb-3 font-semibold">Amount</th>
-              <th className="pb-3 font-semibold">Status</th>
-              <th className="pb-3 font-semibold">Date</th>
-              <th className="pb-3 font-semibold text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#F5F2FA] text-sm">
-            {orders.map((order) => (
-              <tr key={order.id} className="hover:bg-[#F9F7FE] transition">
-                <td className="py-3.5 font-bold text-[#171428]">{order.order_number}</td>
-                <td className="py-3.5 text-[#171428] font-medium">{order.customer_name || 'Customer'}</td>
-                <td className="py-3.5 font-black text-[#171428]">{formatNaira(order.total_amount)}</td>
-                <td className="py-3.5">{getStatusBadge(order.order_status)}</td>
-                <td className="py-3.5 text-xs text-[#77738A]">{formatDate(order.created_at)}</td>
-                <td className="py-3.5 text-right">
-                  <button
-                    onClick={() => onViewOrder?.(order)}
-                    className="text-xs font-bold text-[#6515D5] hover:text-[#4A0D9B] hover:underline"
-                  >
-                    View →
-                  </button>
-                </td>
+      {orders.length === 0 ? (
+        <div className="py-12 text-center text-xs text-[#77738A]">
+          No orders yet. Orders placed by customers in the mobile application will appear here live.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-[#F0EBF8] text-[11px] font-bold uppercase tracking-wider text-[#77738A]">
+                <th className="pb-3 font-semibold">Order #</th>
+                <th className="pb-3 font-semibold">Customer</th>
+                <th className="pb-3 font-semibold">Amount</th>
+                <th className="pb-3 font-semibold">Status</th>
+                <th className="pb-3 font-semibold">Date</th>
+                <th className="pb-3 font-semibold text-right">Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-[#F5F2FA] text-sm">
+              {orders.map((order) => (
+                <tr key={order.id} className="hover:bg-[#F9F7FE] transition">
+                  <td className="py-3.5 font-bold text-[#171428]">{order.order_number}</td>
+                  <td className="py-3.5 text-[#171428] font-medium">{order.customer_name || 'Customer'}</td>
+                  <td className="py-3.5 font-black text-[#171428]">{formatNaira(order.total_amount)}</td>
+                  <td className="py-3.5">{getStatusBadge(order.order_status)}</td>
+                  <td className="py-3.5 text-xs text-[#77738A]">{formatDate(order.created_at)}</td>
+                  <td className="py-3.5 text-right">
+                    <button
+                      onClick={() => onViewOrder?.(order)}
+                      className="text-xs font-bold text-[#6515D5] hover:text-[#4A0D9B] hover:underline"
+                    >
+                      View →
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
