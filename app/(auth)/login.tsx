@@ -52,12 +52,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       const profile = await login(targetEmail, password || 'password123');
-
-      if (profile.role === 'admin') {
-        router.replace('/admin');
-      } else {
-        router.replace('/(tabs)');
-      }
+      router.replace('/(tabs)');
     } catch (e: any) {
       Alert.alert('Login Error', e.message || 'Unable to log in');
     } finally {
@@ -66,15 +61,9 @@ export default function LoginScreen() {
   };
 
   const handleDemoCustomer = () => {
-    setEmail('jane.doe@gmail.com');
-    setPassword('demo1234');
-    handleLogin('jane.doe@gmail.com');
-  };
-
-  const handleDemoAdmin = () => {
-    setEmail('admin@shopeasy.com');
-    setPassword('admin1234');
-    handleLogin('admin@shopeasy.com');
+    setEmail('customer@shopeasy.ng');
+    setPassword('customer123');
+    handleLogin('customer@shopeasy.ng');
   };
 
   return (
@@ -188,26 +177,15 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Quick Demo Access Pills */}
+            {/* Quick Demo Access Pill */}
             <View style={styles.demoSection}>
-              <Text style={styles.demoTitle}>QUICK DEMO ACCESS</Text>
-              <View style={styles.demoButtonsRow}>
-                <TouchableOpacity
-                  style={styles.demoPillCustomer}
-                  onPress={handleDemoCustomer}
-                >
-                  <Ionicons name="person-circle-outline" size={16} color={Colors.primary} />
-                  <Text style={styles.demoPillTextCustomer}>Customer (Jane)</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.demoPillAdmin}
-                  onPress={handleDemoAdmin}
-                >
-                  <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" />
-                  <Text style={styles.demoPillTextAdmin}>Store Owner</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.demoPillCustomer}
+                onPress={handleDemoCustomer}
+              >
+                <Ionicons name="flash-outline" size={16} color={Colors.primary} />
+                <Text style={styles.demoPillTextCustomer}>Quick Demo Customer Sign-In</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Bottom Sign-Up Link */}

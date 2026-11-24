@@ -27,6 +27,7 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -36,6 +37,8 @@ export default function SignUpScreen() {
 
     if (!fullName.trim()) {
       newErrors.fullName = 'Full name is required';
+    } else if (fullName.trim().length < 3) {
+      newErrors.fullName = 'Please enter your full name';
     }
 
     if (!email.trim()) {
@@ -44,13 +47,22 @@ export default function SignUpScreen() {
       newErrors.email = 'Please enter a valid email address';
     }
 
+    const cleanPhone = phoneNumber.replace(/[^0-9+]/g, '');
     if (!phoneNumber.trim()) {
       newErrors.phoneNumber = 'Phone number is required';
+    } else if (cleanPhone.length < 10) {
+      newErrors.phoneNumber = 'Please enter a valid phone number (min 10 digits)';
     }
 
     const passwordCheck = isValidPassword(password);
     if (!passwordCheck.isValid) {
-      newErrors.password = passwordCheck.message || 'Password too short';
+      newErrors.password = passwordCheck.message || 'Password must be at least 6 characters';
+    }
+
+    if (!confirmPassword) {
+      newErrors.confirmPassword = 'Confirm your password';
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
     }
 
     setErrors(newErrors);
@@ -165,6 +177,15 @@ export default function SignUpScreen() {
               value={password}
               onChangeText={setPassword}
               error={errors.password}
+              isPassword
+            />
+
+            <Input
+              placeholder="Confirm Password"
+              iconName="shield-checkmark-outline"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              error={errors.confirmPassword}
               isPassword
             />
 

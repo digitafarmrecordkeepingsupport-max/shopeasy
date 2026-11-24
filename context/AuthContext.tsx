@@ -10,6 +10,7 @@ interface AuthContextType {
   hasCompletedOnboarding: boolean;
   login: (email: string, password?: string) => Promise<UserProfile>;
   signUp: (data: { fullName: string; email: string; phoneNumber?: string; password?: string }) => Promise<UserProfile>;
+  resetPassword: (email: string) => Promise<boolean>;
   logout: () => Promise<void>;
   switchRole: (role: UserRole) => Promise<UserProfile>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<UserProfile>;
@@ -69,6 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resetPassword = async (email: string): Promise<boolean> => {
+    return await AuthService.resetPassword(email);
+  };
+
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -114,6 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasCompletedOnboarding,
         login,
         signUp,
+        resetPassword,
         logout,
         switchRole,
         updateProfile,

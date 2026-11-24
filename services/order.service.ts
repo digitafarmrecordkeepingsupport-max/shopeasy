@@ -365,6 +365,59 @@ export const OrderService = {
   },
 
   /**
+   * Customer: Cancel an order
+   */
+  async cancelOrder(orderId: string, reason?: string): Promise<Order> {
+    const orders = await this.getOrders();
+    const index = orders.findIndex((o) => o.id === orderId);
+    if (index === -1) {
+      throw new Error(`Order ${orderId} not found`);
+    }
+
+    const order = orders[index];
+    if (order.order_status === 'delivered') {
+      throw new Error('Delivered orders cannot be cancelled');
+    }
+
+    const updatedOrder: Order = {
+      ...order,
+      order_status: 'cancelled',
+      cancellation_reason: reason || 'Cancelled by customer',
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ orderStatus: 'cancelled', cancellationReason: reason }),
+      });
+    } catch {}
+
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase
+          .from('orders')
+          .update({
+            order_status: 'cancelled',
+            cancellation_reason: reason,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', orderId);
+      } catch {}
+    }
+
+    const current = await StorageService.getItem<Order[]>(StorageKeys.ORDERS, []);
+    const localIdx = current.findIndex((o) => o.id === orderId);
+    if (localIdx !== -1) {
+      current[localIdx] = updatedOrder;
+      await StorageService.setItem(StorageKeys.ORDERS, current);
+    }
+
+    return updatedOrder;
+  },
+
+  /**
    * Admin: Compute sales metrics and revenue summaries directly from real orders
    */
   async getAdminStats(): Promise<AdminStats> {

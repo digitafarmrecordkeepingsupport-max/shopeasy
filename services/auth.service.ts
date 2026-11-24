@@ -78,7 +78,8 @@ export const AuthService = {
   },
 
   /**
-   * Register a new account
+   * Register a new customer account
+   * Note: Customers can never register themselves as administrators.
    */
   async signUp(data: {
     fullName: string;
@@ -87,9 +88,6 @@ export const AuthService = {
     password?: string;
   }): Promise<UserProfile> {
     const trimmedEmail = data.email.toLowerCase().trim();
-    const isAdmin =
-      trimmedEmail === 'qazeembasitoladimeji@gmsail.com' ||
-      trimmedEmail === 'qazeembasitoladimeji@gmail.com';
 
     const profile: UserProfile = {
       id: 'usr-' + Date.now().toString(36),
@@ -97,7 +95,7 @@ export const AuthService = {
       email: trimmedEmail,
       phone_number: data.phoneNumber,
       avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop',
-      role: isAdmin ? 'admin' : 'customer',
+      role: 'customer', // Strictly customer in mobile application
       created_at: new Date().toISOString(),
     };
 
@@ -110,7 +108,7 @@ export const AuthService = {
             data: {
               full_name: profile.full_name,
               phone_number: profile.phone_number,
-              role: profile.role,
+              role: 'customer',
             },
           },
         });
@@ -121,6 +119,23 @@ export const AuthService = {
 
     await StorageService.setItem(StorageKeys.USER_SESSION, profile);
     return profile;
+  },
+
+  /**
+   * Request password reset instructions
+   */
+  async resetPassword(email: string): Promise<boolean> {
+    const trimmed = email.toLowerCase().trim();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.auth.resetPasswordForEmail(trimmed, {
+          redirectTo: 'shopeasy://reset-password',
+        });
+      } catch (e) {
+        console.warn('Supabase reset password warning:', e);
+      }
+    }
+    return true;
   },
 
   /**

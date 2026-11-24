@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,20 +17,23 @@ import Colors from '../../constants/colors';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import { useOrders } from '../../context/OrderContext';
-import { useAuth } from '../../context/AuthContext';
 import { formatNaira } from '../../utils/currency';
 import { formatDateTime } from '../../utils/date';
 import { BorderRadius, Shadows } from '../../constants/spacing';
 import { OrderStatus } from '../../types';
+import { NotificationService } from '../../services/notification.service';
 
 export default function OrderDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getOrderById, updateOrderStatus } = useOrders();
-  const { role } = useAuth();
+  const { getOrderById, cancelOrder } = useOrders();
 
   const orderId = Array.isArray(id) ? id[0] : id;
   const order = orderId ? getOrderById(orderId) : undefined;
+
+  const [isCancelModalVisible, setIsCancelModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
 
   if (!order) {
     return (
@@ -45,12 +50,12 @@ export default function OrderDetailsScreen() {
     );
   }
 
-  // Steps for tracking progress
+  // 4-Step tracking progress
   const TRACKING_STEPS: { key: OrderStatus; label: string; desc: string }[] = [
     { key: 'pending', label: 'Order Placed', desc: 'We received your order request' },
     { key: 'processing', label: 'Processing & Packaging', desc: 'Preparing items in the warehouse' },
-    { key: 'shipped', label: 'Out for Delivery', desc: 'Courier is delivering your parcel' },
-    { key: 'delivered', label: 'Delivered', desc: 'Package received by customer' },
+    { key: 'shipped', label: 'Out for Delivery', desc: 'Courier is delivering your parcel in Nigeria' },
+    { key: 'delivered', label: 'Delivered', desc: 'Package safely received by customer' },
   ];
 
   const getStepIndex = (status: OrderStatus) => {
@@ -71,18 +76,41 @@ export default function OrderDetailsScreen() {
   };
 
   const currentStep = getStepIndex(order.order_status as OrderStatus);
+  const canCancel = order.order_status === 'pending' || order.order_status === 'processing';
 
-  const handleAdminUpdateStatus = (newStatus: OrderStatus) => {
-    Alert.alert('Update Status', `Change order status to ${newStatus}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Confirm',
-        onPress: async () => {
-          await updateOrderStatus(order.id, newStatus);
-          Alert.alert('Updated', `Order status is now ${newStatus}`);
-        },
-      },
-    ]);
+  const handleConfirmCancel = async () => {
+    if (!cancelReason.trim()) {
+      Alert.alert('Reason Required', 'Please provide a brief reason for cancelling your order.');
+      return;
+    }
+
+    setIsCancelling(true);
+    try {
+      await cancelOrder(order.id, cancelReason.trim());
+
+      // Send in-app notification
+      await NotificationService.addNotification({
+        customer_id: order.customer_id,
+        title: `Order #${order.order_number} Cancelled`,
+        message: `Your cancellation request was processed. Reason: ${cancelReason.trim()}`,
+        type: 'order',
+        related_id: order.id,
+      });
+
+      setIsCancelModalVisible(false);
+      Alert.alert('Order Cancelled', 'Your order has been cancelled.');
+    } catch (e: any) {
+      Alert.alert('Cancellation Error', e.message || 'Unable to cancel order.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleContactSupport = () => {
+    router.push({
+      pathname: '/support',
+      params: { orderNumber: order.order_number },
+    });
   };
 
   return (
@@ -113,34 +141,6 @@ export default function OrderDetailsScreen() {
             </View>
             <Badge variant="status" status={order.order_status as OrderStatus} />
           </View>
-
-          {/* Admin Fast Status Controls */}
-          {role === 'admin' && (
-            <View style={styles.adminControlsBox}>
-              <Text style={styles.adminControlsTitle}>Owner Quick Status Controls:</Text>
-              <View style={styles.statusButtonsRow}>
-                {(['pending', 'processing', 'shipped', 'delivered'] as OrderStatus[]).map((st) => (
-                  <TouchableOpacity
-                    key={st}
-                    onPress={() => handleAdminUpdateStatus(st)}
-                    style={[
-                      styles.statusSelectButton,
-                      order.order_status === st && styles.activeStatusSelectButton,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.statusSelectButtonText,
-                        order.order_status === st && styles.activeStatusSelectButtonText,
-                      ]}
-                    >
-                      {st}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
         </View>
 
         {/* Step-by-Step Delivery Tracking Timeline */}
@@ -149,8 +149,11 @@ export default function OrderDetailsScreen() {
 
           {order.order_status === 'cancelled' ? (
             <View style={styles.cancelledBox}>
-              <Ionicons name="close-circle" size={32} color={Colors.error} />
+              <Ionicons name="close-circle" size={36} color={Colors.error} />
               <Text style={styles.cancelledTitle}>This order has been cancelled.</Text>
+              {order.cancellation_reason && (
+                <Text style={styles.cancelledReason}>Reason: {order.cancellation_reason}</Text>
+              )}
             </View>
           ) : (
             <View style={styles.timelineList}>
@@ -211,7 +214,7 @@ export default function OrderDetailsScreen() {
           {order.items.map((item) => (
             <View key={item.id} style={styles.itemRow}>
               <Image
-                source={{ uri: item.product_image }}
+                source={{ uri: item.product_image || 'https://via.placeholder.com/150' }}
                 style={styles.itemThumbnail}
               />
               <View style={styles.itemInfo}>
@@ -232,11 +235,23 @@ export default function OrderDetailsScreen() {
             <Text style={styles.priceLabel}>Subtotal</Text>
             <Text style={styles.priceValue}>{formatNaira(order.subtotal)}</Text>
           </View>
+
+          {order.discount && order.discount > 0 ? (
+            <View style={styles.priceRow}>
+              <Text style={[styles.priceLabel, { color: Colors.success }]}>Promo Discount</Text>
+              <Text style={[styles.priceValue, { color: Colors.success }]}>
+                -{formatNaira(order.discount)}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Delivery Fee</Text>
             <Text style={styles.priceValue}>{formatNaira(order.delivery_fee)}</Text>
           </View>
+
           <View style={styles.divider} />
+
           <View style={styles.priceRow}>
             <Text style={styles.totalLabel}>Grand Total</Text>
             <Text style={styles.totalValue}>{formatNaira(order.total)}</Text>
@@ -253,7 +268,78 @@ export default function OrderDetailsScreen() {
           </Text>
           <Text style={styles.phoneLine}>Phone: {order.delivery_address.phone_number}</Text>
         </View>
+
+        {/* Actions Row: Support & Cancel */}
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity
+            style={styles.supportButton}
+            onPress={handleContactSupport}
+          >
+            <Ionicons name="chatbubbles-outline" size={18} color={Colors.primary} />
+            <Text style={styles.supportButtonText}>Need Help with this Order?</Text>
+          </TouchableOpacity>
+
+          {canCancel && (
+            <TouchableOpacity
+              style={styles.cancelOrderButton}
+              onPress={() => setIsCancelModalVisible(true)}
+            >
+              <Ionicons name="close-circle-outline" size={18} color={Colors.error} />
+              <Text style={styles.cancelOrderButtonText}>Cancel Order</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </ScrollView>
+
+      {/* Cancel Order Modal */}
+      <Modal
+        visible={isCancelModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsCancelModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Cancel Order #{order.order_number}</Text>
+              <TouchableOpacity onPress={() => setIsCancelModalVisible(false)}>
+                <Ionicons name="close" size={24} color={Colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSub}>
+              Please tell us why you want to cancel this order:
+            </Text>
+
+            <TextInput
+              style={styles.modalTextInput}
+              placeholder="e.g., Ordered by mistake, changed delivery address..."
+              placeholderTextColor={Colors.textLight}
+              value={cancelReason}
+              onChangeText={setCancelReason}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+
+            <View style={styles.modalActions}>
+              <Button
+                title="Keep Order"
+                onPress={() => setIsCancelModalVisible(false)}
+                variant="outline"
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Confirm Cancellation"
+                onPress={handleConfirmCancel}
+                variant="primary"
+                isLoading={isCancelling}
+                style={{ flex: 1, backgroundColor: Colors.error }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -309,45 +395,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  adminControlsBox: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F0F9',
-  },
-  adminControlsTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primary,
-    marginBottom: 8,
-  },
-  statusButtonsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  statusSelectButton: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: '#F3E8FF',
-  },
-  activeStatusSelectButton: {
-    backgroundColor: Colors.primary,
-  },
-  statusSelectButtonText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.primary,
-    textTransform: 'capitalize',
-  },
-  activeStatusSelectButtonText: {
-    color: '#FFFFFF',
-  },
   timelineCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.card,
-    padding: 18,
+    padding: 16,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -359,24 +410,24 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   timelineList: {
-    paddingLeft: 4,
+    paddingLeft: 6,
   },
   timelineRow: {
     flexDirection: 'row',
-    marginBottom: 16,
+    minHeight: 56,
   },
   nodeColumn: {
     alignItems: 'center',
-    width: 28,
+    width: 24,
+    marginRight: 12,
   },
   timelineNode: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#DDD6FE',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#F3F0F9',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 2,
   },
   completedNode: {
     backgroundColor: Colors.primary,
@@ -388,12 +439,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.textMuted,
   },
   timelineLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#EAE6F3',
+    backgroundColor: '#EDE9FE',
     marginVertical: 4,
   },
   completedLine: {
@@ -401,26 +452,41 @@ const styles = StyleSheet.create({
   },
   stepContent: {
     flex: 1,
-    marginLeft: 12,
+    paddingBottom: 14,
   },
   stepLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.textSecondary,
   },
   completedStepLabel: {
     color: Colors.textPrimary,
-    fontWeight: '700',
   },
   stepDesc: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     marginTop: 2,
+  },
+  cancelledBox: {
+    alignItems: 'center',
+    paddingVertical: 18,
+  },
+  cancelledTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.error,
+    marginTop: 8,
+  },
+  cancelledReason: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
   },
   sectionCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: BorderRadius.card,
-    padding: 18,
+    padding: 16,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -428,17 +494,19 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F7F5FC',
   },
   itemThumbnail: {
-    width: 52,
-    height: 52,
-    borderRadius: 10,
-    backgroundColor: '#F8F6FC',
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#F3F0F9',
   },
   itemInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginHorizontal: 12,
   },
   itemName: {
     fontSize: 14,
@@ -452,13 +520,13 @@ const styles = StyleSheet.create({
   },
   itemTotal: {
     fontSize: 14,
-    fontWeight: '800',
-    color: Colors.primary,
+    fontWeight: '700',
+    color: Colors.textPrimary,
   },
   divider: {
     height: 1,
     backgroundColor: '#F3F0F9',
-    marginVertical: 10,
+    marginVertical: 12,
   },
   priceRow: {
     flexDirection: 'row',
@@ -471,11 +539,11 @@ const styles = StyleSheet.create({
   },
   priceValue: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.textPrimary,
   },
   totalLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
@@ -485,7 +553,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   recipientName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
@@ -498,28 +566,93 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 4,
-    fontWeight: '600',
   },
-  cancelledBox: {
+  actionButtonsContainer: {
+    gap: 12,
+    marginTop: 4,
+  },
+  supportButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 18,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: BorderRadius.button,
+    backgroundColor: '#EDE9FE',
   },
-  cancelledTitle: {
-    fontSize: 15,
-    color: Colors.error,
+  supportButtonText: {
+    fontSize: 14,
     fontWeight: '700',
-    marginTop: 8,
+    color: Colors.primary,
+  },
+  cancelOrderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: BorderRadius.button,
+    borderWidth: 1.5,
+    borderColor: '#FEE2E2',
+    backgroundColor: '#FEF2F2',
+  },
+  cancelOrderButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.error,
   },
   notFoundContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 30,
   },
   notFoundTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: Colors.textPrimary,
     marginTop: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 36,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  modalSub: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+  },
+  modalTextInput: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 14,
+    color: Colors.textPrimary,
+    minHeight: 80,
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
   },
 });

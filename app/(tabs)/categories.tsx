@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import { useProducts } from '../../context/ProductContext';
 import { useCart } from '../../context/CartContext';
 import { BorderRadius, Shadows } from '../../constants/spacing';
 
+import { NotificationService } from '../../services/notification.service';
+
 const { width } = Dimensions.get('window');
 const GRID_HORIZONTAL_PADDING = 18;
 const GRID_GAP = 12;
@@ -31,6 +33,13 @@ export default function CategoriesScreen() {
   const { itemCount } = useCart();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeBannerDot, setActiveBannerDot] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    NotificationService.getUnreadCount()
+      .then((c) => setUnreadCount(c))
+      .catch(() => setUnreadCount(0));
+  }, []);
 
   const filteredCategories = categories.filter((cat) =>
     cat.name.toLowerCase().includes(searchQuery.trim().toLowerCase())
@@ -44,10 +53,7 @@ export default function CategoriesScreen() {
   };
 
   const handleNotificationPress = () => {
-    Alert.alert(
-      'Notifications (2)',
-      '1. Order #SE20251125-001 has been delivered.\n2. Weekend Flash Sale: Up to 50% off across all categories!'
-    );
+    router.push('/notifications');
   };
 
   return (
@@ -65,9 +71,11 @@ export default function CategoriesScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Ionicons name="notifications-outline" size={23} color="#171428" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>2</Text>
-            </View>
+            {unreadCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity

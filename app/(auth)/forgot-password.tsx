@@ -14,15 +14,17 @@ import Logo from '../../components/common/Logo';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import { isValidEmail } from '../../utils/validation';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const { resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isSent, setIsSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (!email.trim()) {
       setError('Please enter your email address');
       return;
@@ -35,10 +37,14 @@ export default function ForgotPasswordScreen() {
     setError('');
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await resetPassword(email.trim());
       setIsSent(true);
-    }, 1000);
+    } catch {
+      setIsSent(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

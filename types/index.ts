@@ -64,6 +64,7 @@ export interface Address {
   street_address: string;
   city: string;
   state: string;
+  country?: string;
   is_default: boolean;
 }
 
@@ -91,11 +92,13 @@ export interface Order {
   items: OrderItem[];
   subtotal: number;
   delivery_fee: number;
+  discount?: number;
   total: number;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
   order_status: OrderStatus;
   delivery_address: Address;
+  cancellation_reason?: string;
   created_at: string;
   updated_at: string;
 }
@@ -107,4 +110,56 @@ export interface AdminStats {
   total_customers: number;
   total_sales: number;
   monthly_revenue: { month: string; amount: number }[];
+}
+
+export interface AppNotification {
+  id: string;
+  customer_id?: string;
+  title: string;
+  message: string;
+  type: 'order' | 'payment' | 'promo' | 'system';
+  related_id?: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface Coupon {
+  code: string;
+  type: 'percentage' | 'fixed' | 'free_delivery';
+  value: number; // e.g. 10 for 10%, 2000 for ₦2,000
+  min_spend?: number;
+  description: string;
+  is_active: boolean;
+  expires_at?: string;
+}
+
+export interface ProductReview {
+  id: string;
+  product_id: string;
+  customer_name: string;
+  customer_avatar?: string;
+  rating: number; // 1 to 5
+  comment: string;
+  is_verified_purchase: boolean;
+  created_at: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  customer_id?: string;
+  customer_email: string;
+  customer_name: string;
+  category: 'orders' | 'payment' | 'delivery' | 'general';
+  subject: string;
+  description: string;
+  related_order_number?: string;
+  status: 'open' | 'in_progress' | 'resolved';
+  created_at: string;
+}
+
+export interface FAQItem {
+  id: string;
+  question: string;
+  answer: string;
+  category: 'orders' | 'payment' | 'delivery' | 'returns';
 }

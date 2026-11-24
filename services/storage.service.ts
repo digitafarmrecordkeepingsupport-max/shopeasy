@@ -9,6 +9,10 @@ export const StorageKeys = {
   WISHLIST: 'shopeasy_wishlist',
   ORDERS: 'shopeasy_orders',
   ADDRESSES: 'shopeasy_addresses',
+  NOTIFICATIONS: 'shopeasy_notifications',
+  REVIEWS: 'shopeasy_reviews',
+  SUPPORT_TICKETS: 'shopeasy_support_tickets',
+  APPLIED_COUPON: 'shopeasy_applied_coupon',
 };
 
 export const StorageService = {

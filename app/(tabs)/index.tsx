@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,22 +18,36 @@ import PromoBanner from '../../components/home/PromoBanner';
 import CategorySection from '../../components/home/CategorySection';
 import ProductCard from '../../components/product/ProductCard';
 import Badge from '../../components/common/Badge';
-import RoleSwitcher from '../../components/common/RoleSwitcher';
 import { useProducts } from '../../context/ProductContext';
-import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
+import { NotificationService } from '../../services/notification.service';
 
 export default function CustomerHomeScreen() {
   const router = useRouter();
-  const { featuredProducts, categories, refreshProducts, isLoading } = useProducts();
-  const { role } = useAuth();
+  const { products, featuredProducts, categories, refreshProducts, isLoading } = useProducts();
+  const { itemCount } = useCart();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  const loadUnread = async () => {
+    try {
+      const count = await NotificationService.getUnreadCount();
+      setUnreadCount(count);
+    } catch {
+      setUnreadCount(0);
+    }
+  };
+
+  useEffect(() => {
+    loadUnread();
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refreshProducts();
+    await Promise.all([refreshProducts(), loadUnread()]);
     setIsRefreshing(false);
   };
 
@@ -46,35 +60,49 @@ export default function CustomerHomeScreen() {
     }
   };
 
-  const handleNotificationPress = () => {
-    Alert.alert(
-      'Notifications (2)',
-      '1. Order #SE-89241 is currently being packed for delivery.\n2. Exclusive Weekend Promo: 20% off on all Fashion & Shoes with code EASY20!'
-    );
-  };
-
   const displayedProducts = selectedCategory === 'all'
-    ? featuredProducts
-    : featuredProducts.filter((p) => p.category_id === selectedCategory);
+    ? (featuredProducts.length > 0 ? featuredProducts : products.slice(0, 6))
+    : products.filter((p) => p.category_id === selectedCategory);
+
+  const recentlyAdded = products
+    .filter((p) => !displayedProducts.some((dp) => dp.id === p.id))
+    .slice(0, 4);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Top Header Bar matching reference */}
+      {/* Top Header Bar */}
       <View style={styles.header}>
         {/* Left ShopEasy Logo */}
         <Logo variant="dark" size="small" />
 
-        {/* Right Notification Bell with Red Badge "2" */}
-        <TouchableOpacity
-          style={styles.notificationButton}
-          onPress={handleNotificationPress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
-          <View style={styles.badgeWrapper}>
-            <Badge count={2} />
-          </View>
-        </TouchableOpacity>
+        {/* Right Action Icons: Notifications & Cart */}
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => router.push('/notifications')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
+            {unreadCount > 0 && (
+              <View style={styles.badgeWrapper}>
+                <Badge count={unreadCount} />
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => router.push('/(tabs)/cart')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="cart-outline" size={24} color={Colors.textPrimary} />
+            {itemCount > 0 && (
+              <View style={styles.badgeWrapper}>
+                <Badge count={itemCount} />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -88,33 +116,19 @@ export default function CustomerHomeScreen() {
           />
         }
       >
-        {/* Search Bar matching reference */}
+        {/* Search Bar */}
         <SearchBar
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={handleSearchSubmit}
-          placeholder="Search for products..."
+          placeholder="Search for products, brands, categories..."
           style={styles.searchBar}
         />
 
-        {/* Admin Quick Jump Banner if Store Owner is logged in */}
-        {role === 'admin' && (
-          <TouchableOpacity
-            style={styles.adminBanner}
-            onPress={() => router.push('/admin')}
-          >
-            <View style={styles.adminBannerContent}>
-              <Ionicons name="speedometer-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.adminBannerText}>Store Owner: Open Admin Dashboard</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
-          </TouchableOpacity>
-        )}
-
-        {/* Promotional Banner matching reference */}
+        {/* Promotional Banner */}
         <PromoBanner />
 
-        {/* Shop by Category Icons Row matching reference */}
+        {/* Shop by Category */}
         <CategorySection
           categories={categories}
           selectedCategoryId={selectedCategory}
@@ -123,9 +137,11 @@ export default function CustomerHomeScreen() {
           }}
         />
 
-        {/* Featured Products Section Header matching reference */}
+        {/* Featured Products Section Header */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Featured Products</Text>
+          <Text style={styles.sectionTitle}>
+            {selectedCategory === 'all' ? 'Featured Products' : 'Products in Category'}
+          </Text>
           <TouchableOpacity
             onPress={() => router.push('/products')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -134,17 +150,50 @@ export default function CustomerHomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Two-Column Product Grid matching reference */}
-        <View style={styles.productGrid}>
-          {displayedProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </View>
+        {/* Loading Indicator */}
+        {isLoading && products.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Loading products...</Text>
+          </View>
+        ) : displayedProducts.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="cube-outline" size={48} color={Colors.textLight} />
+            <Text style={styles.emptyTitle}>No products found</Text>
+            <Text style={styles.emptySubtitle}>
+              {selectedCategory !== 'all'
+                ? 'Try selecting another category or check back later.'
+                : 'Products added from the admin dashboard will appear here.'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.productGrid}>
+            {displayedProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </View>
+        )}
 
-        {/* Role Switcher Pill for reviewer ease */}
-        <View style={{ marginTop: 10, marginBottom: 20 }}>
-          <RoleSwitcher />
-        </View>
+        {/* Recently Added Section (when in "all" view and more products exist) */}
+        {selectedCategory === 'all' && recentlyAdded.length > 0 && (
+          <>
+            <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+              <Text style={styles.sectionTitle}>Recently Added</Text>
+              <TouchableOpacity
+                onPress={() => router.push('/products')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.seeAllText}>See All →</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.productGrid}>
+              {recentlyAdded.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -163,7 +212,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     backgroundColor: '#FFFFFF',
   },
-  notificationButton: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerIconButton: {
     position: 'relative',
     width: 38,
     height: 38,
@@ -182,26 +236,6 @@ const styles = StyleSheet.create({
   searchBar: {
     marginTop: 6,
     marginBottom: 8,
-  },
-  adminBanner: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  adminBannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  adminBannerText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -225,5 +259,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+  },
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  emptyContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  emptySubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
 });

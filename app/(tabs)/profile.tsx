@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,13 +15,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../../constants/colors';
 import Badge from '../../components/common/Badge';
-import RoleSwitcher from '../../components/common/RoleSwitcher';
+import Button from '../../components/common/Button';
 import { useAuth } from '../../context/AuthContext';
 import { BorderRadius, Shadows } from '../../constants/spacing';
+import { NotificationService } from '../../services/notification.service';
 
 export default function CustomerProfileScreen() {
   const router = useRouter();
-  const { user, role, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+
+  useEffect(() => {
+    loadUnread();
+  }, []);
+
+  const loadUnread = async () => {
+    try {
+      const count = await NotificationService.getUnreadCount();
+      setUnreadCount(count);
+    } catch {
+      setUnreadCount(0);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out of ShopEasy?', [
@@ -40,74 +57,63 @@ export default function CustomerProfileScreen() {
     {
       id: 'orders',
       title: 'My Orders',
-      subtitle: 'View and track your orders',
+      subtitle: 'View, track, and manage your orders',
       icon: 'cube-outline',
       iconColor: Colors.primary,
       iconBg: '#F3E8FF',
       onPress: () => router.push('/(tabs)/orders'),
     },
     {
+      id: 'wishlist',
+      title: 'My Wishlist',
+      subtitle: 'Items you have saved to buy later',
+      icon: 'heart-outline',
+      iconColor: Colors.primary,
+      iconBg: '#FCE7F3',
+      onPress: () => router.push('/wishlist'),
+    },
+    {
       id: 'addresses',
-      title: 'My Addresses',
+      title: 'Delivery Addresses',
+      subtitle: 'Manage saved shipping addresses',
       icon: 'location-outline',
       iconColor: Colors.primary,
       iconBg: '#EDE9FE',
       onPress: () => router.push('/profile/addresses'),
     },
     {
-      id: 'payments',
-      title: 'Payment Methods',
-      icon: 'card-outline',
-      iconColor: Colors.primary,
-      iconBg: '#EDE9FE',
-      onPress: () =>
-        Alert.alert(
-          'Payment Methods',
-          'Supported methods: Credit/Debit Cards, Bank Transfer, Paystack (Nigeria), and Cash on Delivery.'
-        ),
-    },
-    {
       id: 'notifications',
       title: 'Notifications',
+      subtitle: 'Order updates and promotional offers',
       icon: 'notifications-outline',
       iconColor: Colors.primary,
       iconBg: '#EDE9FE',
-      badge: 2,
-      onPress: () =>
-        Alert.alert(
-          'Notifications',
-          '1. Order #SE-89241 has been dispatched!\n2. Weekend Flash Sale: 20% off on all sneakers.'
-        ),
+      badge: unreadCount > 0 ? unreadCount : undefined,
+      onPress: () => router.push('/notifications'),
     },
     {
       id: 'help',
       title: 'Help & Support',
-      icon: 'help-circle-outline',
+      subtitle: 'FAQs, live WhatsApp chat, call hotline',
+      icon: 'headset-outline',
       iconColor: Colors.primary,
       iconBg: '#EDE9FE',
-      onPress: () =>
-        Alert.alert(
-          'Help & Support',
-          'Contact ShopEasy Support:\nEmail: support@shopeasy.com\nWhatsApp/Call: +234 800 SHOPEASY\nAvailable 24/7.'
-        ),
+      onPress: () => router.push('/support'),
     },
     {
       id: 'about',
       title: 'About ShopEasy',
+      subtitle: 'Version, policies, terms & customer safety',
       icon: 'information-circle-outline',
       iconColor: Colors.primary,
       iconBg: '#EDE9FE',
-      onPress: () =>
-        Alert.alert(
-          'About ShopEasy',
-          'ShopEasy v1.0.0\nTagline: Shop Smarter. Live Better.\nA modern, premium single-vendor e-commerce application powered by React Native, Expo, and Supabase.'
-        ),
+      onPress: () => setShowAboutModal(true),
     },
   ];
 
   return (
     <View style={styles.container}>
-      {/* Curved Purple Header Background matching reference */}
+      {/* Curved Purple Header Background */}
       <LinearGradient
         colors={[Colors.darkPurple, Colors.primary]}
         style={styles.headerGradient}
@@ -128,13 +134,11 @@ export default function CustomerProfileScreen() {
 
             {/* User Info */}
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>{user?.full_name || 'Jane Doe'}</Text>
-              <Text style={styles.userEmail}>{user?.email || 'jane.doe@gmail.com'}</Text>
-              {role === 'admin' && (
-                <View style={styles.ownerBadge}>
-                  <Text style={styles.ownerBadgeText}>Store Owner</Text>
-                </View>
-              )}
+              <Text style={styles.userName}>{user?.full_name || 'Customer'}</Text>
+              <Text style={styles.userEmail}>{user?.email || 'customer@shopeasy.ng'}</Text>
+              {user?.phone_number ? (
+                <Text style={styles.userPhone}>{user.phone_number}</Text>
+              ) : null}
             </View>
 
             {/* Edit Profile Pencil Icon Button */}
@@ -186,7 +190,7 @@ export default function CustomerProfileScreen() {
             </React.Fragment>
           ))}
 
-          {/* Red Log Out Option matching reference */}
+          {/* Red Log Out Option */}
           <View style={styles.menuDivider} />
           <TouchableOpacity
             style={styles.menuRow}
@@ -202,10 +206,54 @@ export default function CustomerProfileScreen() {
             <Ionicons name="chevron-forward" size={18} color={Colors.error} />
           </TouchableOpacity>
         </View>
-
-        {/* Role Switcher for seamless testing */}
-        <RoleSwitcher />
       </ScrollView>
+
+      {/* About Modal */}
+      <Modal
+        visible={showAboutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAboutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, Shadows.modal]}>
+            <View style={styles.aboutHeader}>
+              <Ionicons name="cart" size={36} color={Colors.primary} />
+              <Text style={styles.aboutTitle}>ShopEasy</Text>
+              <Text style={styles.aboutTagline}>Shop Smarter. Live Better.</Text>
+              <View style={styles.versionBadge}>
+                <Text style={styles.versionBadgeText}>Version 1.0.0</Text>
+              </View>
+            </View>
+
+            <Text style={styles.aboutDescription}>
+              ShopEasy is a single-vendor Nigerian e-commerce platform offering premium fashion, electronics, home essentials, and lifestyle products with doorstep delivery and reliable payment processing.
+            </Text>
+
+            <View style={styles.aboutHighlights}>
+              <View style={styles.aboutHighlightRow}>
+                <Ionicons name="shield-checkmark" size={16} color={Colors.success} />
+                <Text style={styles.aboutHighlightText}>Paystack & Card Secure Payments</Text>
+              </View>
+              <View style={styles.aboutHighlightRow}>
+                <Ionicons name="car" size={16} color={Colors.primary} />
+                <Text style={styles.aboutHighlightText}>Nationwide Nigerian Delivery</Text>
+              </View>
+              <View style={styles.aboutHighlightRow}>
+                <Ionicons name="refresh" size={16} color={Colors.accentOrange} />
+                <Text style={styles.aboutHighlightText}>7-Day Customer Return Guarantee</Text>
+              </View>
+            </View>
+
+            <Button
+              title="Close"
+              onPress={() => setShowAboutModal(false)}
+              variant="primary"
+              style={{ width: '100%', marginTop: 20 }}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -228,13 +276,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
   },
   avatarWrapper: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 2.5,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 3,
     borderColor: '#FFFFFF',
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
@@ -245,52 +292,44 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     flex: 1,
-    marginLeft: 14,
+    marginLeft: 16,
   },
   userName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
   userEmail: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: '#EDE9FE',
     marginTop: 2,
   },
-  ownerBadge: {
-    backgroundColor: Colors.accentOrange,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-    marginTop: 5,
-  },
-  ownerBadgeText: {
-    color: '#171428',
-    fontSize: 10,
-    fontWeight: '800',
+  userPhone: {
+    fontSize: 12,
+    color: '#DDD6FE',
+    marginTop: 2,
   },
   editButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingHorizontal: 18,
-    marginTop: -20,
-    paddingBottom: 36,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
   menuCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    paddingVertical: 8,
+    borderRadius: BorderRadius.card,
     paddingHorizontal: 16,
+    paddingVertical: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#F3F0F9',
   },
   menuRow: {
     flexDirection: 'row',
@@ -298,8 +337,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   menuIconContainer: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -310,7 +349,7 @@ const styles = StyleSheet.create({
   },
   menuTitle: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.textPrimary,
   },
   menuSubtitle: {
@@ -323,12 +362,75 @@ const styles = StyleSheet.create({
   },
   menuDivider: {
     height: 1,
-    backgroundColor: '#F3F0F9',
-    marginLeft: 52,
+    backgroundColor: '#F7F5FC',
   },
   logOutTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: Colors.error,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 360,
+  },
+  aboutHeader: {
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  aboutTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    marginTop: 6,
+  },
+  aboutTagline: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  versionBadge: {
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  versionBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
+  aboutDescription: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  aboutHighlights: {
+    width: '100%',
+    gap: 8,
+  },
+  aboutHighlightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aboutHighlightText: {
+    fontSize: 13,
+    color: Colors.textPrimary,
+    fontWeight: '600',
   },
 });

@@ -8,6 +8,7 @@ interface OrderContextType {
   isLoading: boolean;
   placeOrder: (orderInput: Omit<Order, 'id' | 'order_number' | 'created_at' | 'updated_at'>) => Promise<Order>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<Order>;
+  cancelOrder: (orderId: string, reason?: string) => Promise<Order>;
   getOrderById: (orderId: string) => Order | undefined;
   refreshOrders: () => Promise<void>;
   getAdminStats: () => Promise<AdminStats>;
@@ -56,6 +57,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return updated;
   };
 
+  const cancelOrder = async (orderId: string, reason?: string): Promise<Order> => {
+    const cancelled = await OrderService.cancelOrder(orderId, reason);
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? cancelled : o)));
+    return cancelled;
+  };
+
   const getOrderById = (orderId: string): Order | undefined => {
     return orders.find((o) => o.id === orderId);
   };
@@ -71,6 +78,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isLoading,
         placeOrder,
         updateOrderStatus,
+        cancelOrder,
         getOrderById,
         refreshOrders,
         getAdminStats,
