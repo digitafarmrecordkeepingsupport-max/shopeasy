@@ -42,7 +42,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await req.json();
-    const { orderStatus, paymentStatus } = body;
+    const { orderStatus, paymentStatus, trackingNumber, carrier, estimatedDelivery, cancellationReason } = body;
 
     if (isMongoDBConfigured()) {
       await connectToDatabase();
@@ -70,6 +70,10 @@ export async function PATCH(
 
       if (orderStatus) existingOrder.orderStatus = orderStatus;
       if (paymentStatus) existingOrder.paymentStatus = paymentStatus;
+      if (trackingNumber !== undefined) existingOrder.trackingNumber = trackingNumber;
+      if (carrier !== undefined) (existingOrder as any).carrier = carrier;
+      if (estimatedDelivery !== undefined) (existingOrder as any).estimatedDelivery = estimatedDelivery;
+      if (cancellationReason !== undefined) (existingOrder as any).cancellationReason = cancellationReason;
 
       await existingOrder.save();
 

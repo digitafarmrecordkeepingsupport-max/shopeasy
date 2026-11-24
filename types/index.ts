@@ -98,6 +98,9 @@ export interface Order {
   payment_status: PaymentStatus;
   order_status: OrderStatus;
   delivery_address: Address;
+  tracking_number?: string;
+  carrier?: string;
+  estimated_delivery?: string;
   cancellation_reason?: string;
   created_at: string;
   updated_at: string;

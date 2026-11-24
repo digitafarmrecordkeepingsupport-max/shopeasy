@@ -269,6 +269,31 @@ export default function OrderDetailsScreen() {
           <Text style={styles.phoneLine}>Phone: {order.delivery_address.phone_number}</Text>
         </View>
 
+        {/* Courier & Tracking Information Card */}
+        {(order.tracking_number || order.carrier || order.estimated_delivery) ? (
+          <View style={[styles.sectionCard, Shadows.card, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD', borderWidth: 1 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Ionicons name="car-outline" size={18} color="#0284C7" style={{ marginRight: 6 }} />
+              <Text style={[styles.cardHeading, { marginBottom: 0, color: '#0369A1' }]}>Shipment & Waybill Info</Text>
+            </View>
+            {order.carrier ? (
+              <Text style={{ fontSize: 13, color: '#0C4A6E', marginBottom: 4 }}>
+                Delivery Partner: <Text style={{ fontWeight: '700' }}>{order.carrier}</Text>
+              </Text>
+            ) : null}
+            {order.tracking_number ? (
+              <Text style={{ fontSize: 13, color: '#0C4A6E', marginBottom: 4 }}>
+                Tracking / Waybill: <Text style={{ fontWeight: '700' }}>{order.tracking_number}</Text>
+              </Text>
+            ) : null}
+            {order.estimated_delivery ? (
+              <Text style={{ fontSize: 13, color: '#0C4A6E' }}>
+                Est. Delivery: <Text style={{ fontWeight: '700' }}>{order.estimated_delivery}</Text>
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {/* Actions Row: Support & Cancel */}
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity

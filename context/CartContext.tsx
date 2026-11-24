@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { CartItem, Product } from '../types';
 import { StorageService, StorageKeys } from '../services/storage.service';
+import { SettingsService } from '../services/settings.service';
+
 
 interface CartContextType {
   items: CartItem[];
@@ -18,11 +20,24 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [baseDeliveryFee, setBaseDeliveryFee] = useState<number>(2000);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(50000);
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     loadCart();
+    loadSettings();
   }, []);
+
+  const loadSettings = async () => {
+    try {
+      const cfg = await SettingsService.getSettings();
+      if (cfg.deliveryFee !== undefined) setBaseDeliveryFee(cfg.deliveryFee);
+      if (cfg.freeShippingThreshold !== undefined) setFreeShippingThreshold(cfg.freeShippingThreshold);
+    } catch (e) {
+      // Keep defaults
+    }
+  };
 
   const loadCart = async () => {
     try {
@@ -90,7 +105,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const deliveryFee = subtotal > 50000 || subtotal === 0 ? 0 : 2000;
+  const deliveryFee = subtotal > freeShippingThreshold || subtotal === 0 ? 0 : baseDeliveryFee;
   const total = subtotal + deliveryFee;
 
   return (

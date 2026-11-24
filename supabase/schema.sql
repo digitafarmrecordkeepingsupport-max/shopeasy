@@ -970,3 +970,167 @@ VALUES
   ('d1000000-0000-0000-0000-000000000003', 'Free Delivery', 'Shipping', 'Jun 1, 2025', 'Jun 30, 2025', 'Completed', 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?q=80&w=400', 'Free Shipping', 9200, 2150, 580),
   ('d1000000-0000-0000-0000-000000000004', 'Back to School', 'Seasonal', 'May 1, 2025', 'May 31, 2025', 'Completed', 'https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=400', '15%', 5850, 1460, 370)
 ON CONFLICT (id) DO NOTHING;
+
+-- ====================================================================
+-- SECTION 14: COUPONS & DISCOUNT ENGINE
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS public.coupons (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT NOT NULL UNIQUE,
+  type TEXT NOT NULL CHECK (type IN ('percentage', 'fixed', 'free_delivery')),
+  value INTEGER NOT NULL CHECK (value > 0),
+  min_spend INTEGER DEFAULT 0,
+  max_discount INTEGER,
+  description TEXT NOT NULL,
+  usage_limit INTEGER,
+  usage_count INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE NOT NULL,
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_coupons_code ON public.coupons(code);
+CREATE INDEX IF NOT EXISTS idx_coupons_active ON public.coupons(is_active);
+
+ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read active coupons" ON public.coupons FOR SELECT USING (is_active = TRUE OR public.is_admin());
+CREATE POLICY "Admins manage all coupons" ON public.coupons FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+INSERT INTO public.coupons (code, type, value, min_spend, description, is_active)
+VALUES
+  ('EASY10', 'percentage', 10, 10000, '10% off on orders above ₦10,000', true),
+  ('EASY20', 'percentage', 20, 30000, '20% off on orders above ₦30,000', true),
+  ('FREESHIP', 'free_delivery', 2000, 15000, 'Free Delivery across Nigeria on orders above ₦15,000', true),
+  ('WELCOME5000', 'fixed', 5000, 25000, '₦5,000 flat discount on orders above ₦25,000', true)
+ON CONFLICT (code) DO NOTHING;
+
+-- ====================================================================
+-- SECTION 15: NOTIFICATIONS & BROADCASTS
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'system' CHECK (type IN ('order', 'payment', 'promo', 'system')),
+  related_id TEXT,
+  is_read BOOLEAN DEFAULT FALSE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_customer ON public.notifications(customer_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON public.notifications(is_read);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users read own notifications, admins read all" ON public.notifications FOR SELECT
+  USING (customer_id = auth.uid() OR customer_id IS NULL OR public.is_admin());
+CREATE POLICY "Users update own notifications" ON public.notifications FOR UPDATE
+  USING (customer_id = auth.uid() OR public.is_admin());
+CREATE POLICY "Admins create notifications" ON public.notifications FOR INSERT
+  WITH CHECK (true);
+CREATE POLICY "Admins delete notifications" ON public.notifications FOR DELETE
+  USING (public.is_admin() OR customer_id = auth.uid());
+
+-- ====================================================================
+-- SECTION 16: PRODUCT REVIEWS & MODERATION
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS public.product_reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id TEXT NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  customer_name TEXT NOT NULL,
+  customer_avatar TEXT,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment TEXT NOT NULL,
+  is_verified_purchase BOOLEAN DEFAULT TRUE,
+  is_approved BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_product ON public.product_reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_approved ON public.product_reviews(is_approved);
+
+ALTER TABLE public.product_reviews ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read approved reviews" ON public.product_reviews FOR SELECT
+  USING (is_approved = TRUE OR public.is_admin());
+CREATE POLICY "Authenticated users submit reviews" ON public.product_reviews FOR INSERT
+  WITH CHECK (true);
+CREATE POLICY "Admins moderate reviews" ON public.product_reviews FOR UPDATE
+  USING (public.is_admin());
+CREATE POLICY "Admins delete reviews" ON public.product_reviews FOR DELETE
+  USING (public.is_admin());
+
+-- ====================================================================
+-- SECTION 17: CUSTOMER SUPPORT REQUESTS / TICKETS
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS public.support_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  customer_name TEXT NOT NULL,
+  customer_email TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('orders', 'payment', 'delivery', 'general')),
+  subject TEXT NOT NULL,
+  description TEXT NOT NULL,
+  related_order_number TEXT,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
+  admin_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_support_status ON public.support_requests(status);
+CREATE INDEX IF NOT EXISTS idx_support_email ON public.support_requests(customer_email);
+
+ALTER TABLE public.support_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users read own tickets, admins read all" ON public.support_requests FOR SELECT
+  USING (customer_id = auth.uid() OR customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid()) OR public.is_admin());
+CREATE POLICY "Users insert support tickets" ON public.support_requests FOR INSERT
+  WITH CHECK (true);
+CREATE POLICY "Admins update support tickets" ON public.support_requests FOR UPDATE
+  USING (public.is_admin());
+
+-- ====================================================================
+-- SECTION 18: PAYMENT TRANSACTIONS
+-- ====================================================================
+CREATE TABLE IF NOT EXISTS public.payment_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id TEXT REFERENCES public.orders(id) ON DELETE SET NULL,
+  order_number TEXT NOT NULL,
+  customer_name TEXT NOT NULL,
+  customer_email TEXT NOT NULL,
+  amount BIGINT NOT NULL CHECK (amount >= 0),
+  currency TEXT DEFAULT 'NGN' NOT NULL,
+  payment_method payment_method NOT NULL DEFAULT 'paystack',
+  payment_status payment_status NOT NULL DEFAULT 'pending',
+  reference TEXT NOT NULL UNIQUE,
+  paystack_reference TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_order ON public.payment_transactions(order_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_reference ON public.payment_transactions(reference);
+
+ALTER TABLE public.payment_transactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Transactions viewable by admin or owner" ON public.payment_transactions FOR SELECT
+  USING (public.is_admin() OR customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid()));
+CREATE POLICY "Admins manage transactions" ON public.payment_transactions FOR ALL
+  USING (public.is_admin());
+
+-- ====================================================================
+-- REALTIME PUBLICATIONS FOR AUTOMATIC SYNCHRONIZATION
+-- ====================================================================
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.categories;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.coupons;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.store_settings;
+EXCEPTION
+  WHEN OTHERS THEN null;
+END $$;

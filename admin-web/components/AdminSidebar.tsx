@@ -15,7 +15,13 @@ import {
   LogOut,
   ChevronRight,
   Rocket,
+  Boxes,
+  Star,
+  Headphones,
+  Bell,
+  History,
 } from 'lucide-react';
+
 import { AdminAuthService } from '../services/adminAuth.service';
 
 interface NavItem {
@@ -32,12 +38,17 @@ export default function AdminSidebar() {
 
   const navItems: NavItem[] = [
     { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard size={20} /> },
-    { label: 'Products', href: '/products', icon: <Package size={20} />, hasSubmenu: true },
-    { label: 'Orders', href: '/orders', icon: <ShoppingCart size={20} />, badge: 3 },
+    { label: 'Products', href: '/products', icon: <Package size={20} /> },
+    { label: 'Inventory', href: '/inventory', icon: <Boxes size={20} /> },
+    { label: 'Orders', href: '/orders', icon: <ShoppingCart size={20} /> },
     { label: 'Customers', href: '/customers', icon: <Users size={20} /> },
     { label: 'Categories', href: '/categories', icon: <Grid size={20} /> },
-    { label: 'Analytics', href: '/analytics', icon: <BarChart3 size={20} /> },
+    { label: 'Reviews', href: '/reviews', icon: <Star size={20} /> },
+    { label: 'Support & Tickets', href: '/support', icon: <Headphones size={20} /> },
+    { label: 'Broadcasts', href: '/broadcasts', icon: <Bell size={20} /> },
     { label: 'Marketing', href: '/marketing', icon: <Megaphone size={20} /> },
+    { label: 'Analytics', href: '/analytics', icon: <BarChart3 size={20} /> },
+    { label: 'Audit Logs', href: '/audit-logs', icon: <History size={20} /> },
     { label: 'Settings', href: '/settings', icon: <Settings size={20} /> },
   ];
 

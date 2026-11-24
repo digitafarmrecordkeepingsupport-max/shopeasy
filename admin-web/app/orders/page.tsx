@@ -15,6 +15,8 @@ import {
   Clock,
   Truck,
   Package,
+  Send,
+  AlertTriangle,
 } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar';
 import AdminHeader from '../../components/AdminHeader';
@@ -29,6 +31,14 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Fulfillment form state for selected order
+  const [carrier, setCarrier] = useState('GIG Logistics');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [estimatedDelivery, setEstimatedDelivery] = useState('');
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [savingFulfillment, setSavingFulfillment] = useState(false);
+  const [fulfillmentToast, setFulfillmentToast] = useState<string | null>(null);
 
   const filterTabs = [
     { id: 'all', label: 'All Orders' },
@@ -53,6 +63,15 @@ export default function OrdersPage() {
     setOrders(data);
   };
 
+  const handleOpenOrder = (o: Order) => {
+    setSelectedOrder(o);
+    setCarrier(o.carrier || 'GIG Logistics');
+    setTrackingNumber(o.tracking_number || '');
+    setEstimatedDelivery(o.estimated_delivery || '');
+    setCancellationReason(o.cancellation_reason || '');
+    setFulfillmentToast(null);
+  };
+
   const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus) => {
     const success = await AdminOrderService.updateOrderStatus(orderId, newStatus);
     if (success) {
@@ -62,6 +81,34 @@ export default function OrdersPage() {
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder({ ...selectedOrder, order_status: newStatus });
       }
+    }
+  };
+
+  const handleSaveFulfillment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrder) return;
+
+    setSavingFulfillment(true);
+    const success = await AdminOrderService.updateOrderFulfillment(selectedOrder.id, {
+      carrier,
+      trackingNumber,
+      estimatedDelivery,
+      cancellationReason: selectedOrder.order_status === 'cancelled' ? cancellationReason : undefined,
+    });
+    setSavingFulfillment(false);
+
+    if (success) {
+      setFulfillmentToast('Shipping and tracking info saved & synced to mobile app!');
+      setSelectedOrder({
+        ...selectedOrder,
+        carrier,
+        tracking_number: trackingNumber,
+        estimated_delivery: estimatedDelivery,
+        cancellation_reason: cancellationReason,
+      });
+      setTimeout(() => setFulfillmentToast(null), 4000);
+    } else {
+      alert('Failed to save shipping fulfillment info.');
     }
   };
 
@@ -85,7 +132,8 @@ export default function OrdersPage() {
     const query = searchQuery.toLowerCase();
     return (
       o.order_number.toLowerCase().includes(query) ||
-      (o.customer_name && o.customer_name.toLowerCase().includes(query))
+      (o.customer_name && o.customer_name.toLowerCase().includes(query)) ||
+      (o.tracking_number && o.tracking_number.toLowerCase().includes(query))
     );
   });
 
@@ -105,7 +153,7 @@ export default function OrdersPage() {
                 <span>Order Management</span>
               </h1>
               <p className="text-sm text-[#77738A] mt-1 font-medium">
-                Track, process, and update status of customer orders across Nigeria.
+                Track, process, assign shipping carriers, and update status of customer orders across Nigeria.
               </p>
             </div>
           </div>
@@ -133,7 +181,7 @@ export default function OrdersPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search orders..."
+                placeholder="Search orders or tracking #..."
                 className="w-full pl-9 pr-4 py-2 bg-[#F7F5FC] border border-[#EAE6F3] rounded-xl text-xs text-[#171428] placeholder-[#77738A] focus:outline-none focus:ring-2 focus:ring-[#6515D5]/20 focus:border-[#6515D5]"
               />
               <Search size={15} className="absolute left-3 top-2.5 text-[#77738A]" />
@@ -156,38 +204,54 @@ export default function OrdersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F5F2FA] text-sm">
-                  {filteredOrders.map((o) => (
-                    <tr key={o.id} className="hover:bg-[#FAF8FE] transition">
-                      <td className="py-4 px-6 font-bold text-[#171428]">{o.order_number}</td>
-                      <td className="py-4 px-6">
-                        <div className="font-bold text-[#171428]">{o.customer_name || 'Customer'}</div>
-                        <div className="text-xs text-[#77738A]">{o.customer_email || 'Verified Buyer'}</div>
-                      </td>
-                      <td className="py-4 px-6 text-xs text-[#77738A]">{formatDate(o.created_at)}</td>
-                      <td className="py-4 px-6">
-                        <span
-                          className={`text-xs font-bold px-2.5 py-0.5 rounded-md ${
-                            o.payment_status === 'paid'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}
-                        >
-                          {o.payment_status.toUpperCase()} ({o.payment_method})
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 font-black text-[#6515D5]">{formatNaira(o.total_amount)}</td>
-                      <td className="py-4 px-6">{getStatusBadge(o.order_status)}</td>
-                      <td className="py-4 px-6 text-right">
-                        <button
-                          onClick={() => setSelectedOrder(o)}
-                          className="px-3 py-1.5 rounded-xl bg-[#F8F6FD] hover:bg-[#F0EAFB] text-[#6515D5] text-xs font-bold transition inline-flex items-center space-x-1"
-                        >
-                          <Eye size={14} />
-                          <span>View Details</span>
-                        </button>
+                  {filteredOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-[#77738A]">
+                        No orders matching your criteria.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredOrders.map((o) => (
+                      <tr key={o.id} className="hover:bg-[#FAF8FE] transition">
+                        <td className="py-4 px-6 font-bold text-[#171428]">
+                          <div>{o.order_number}</div>
+                          {o.tracking_number && (
+                            <span className="text-[10px] text-[#2563EB] font-mono flex items-center space-x-1 mt-0.5">
+                              <Truck size={10} />
+                              <span>{o.tracking_number}</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="font-bold text-[#171428]">{o.customer_name || 'Customer'}</div>
+                          <div className="text-xs text-[#77738A]">{o.customer_email || 'Verified Buyer'}</div>
+                        </td>
+                        <td className="py-4 px-6 text-xs text-[#77738A]">{formatDate(o.created_at)}</td>
+                        <td className="py-4 px-6">
+                          <span
+                            className={`text-xs font-bold px-2.5 py-0.5 rounded-md ${
+                              o.payment_status === 'paid'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {o.payment_status.toUpperCase()} ({o.payment_method})
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 font-black text-[#6515D5]">{formatNaira(o.total_amount)}</td>
+                        <td className="py-4 px-6">{getStatusBadge(o.order_status)}</td>
+                        <td className="py-4 px-6 text-right">
+                          <button
+                            onClick={() => handleOpenOrder(o)}
+                            className="px-3 py-1.5 rounded-xl bg-[#F8F6FD] hover:bg-[#F0EAFB] text-[#6515D5] text-xs font-bold transition inline-flex items-center space-x-1"
+                          >
+                            <Eye size={14} />
+                            <span>Manage</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -195,10 +259,10 @@ export default function OrdersPage() {
         </main>
       </div>
 
-      {/* Order Details Modal */}
+      {/* Order Details & Logistics Modal */}
       {selectedOrder && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-xl w-full border border-[#EAE6F3] shadow-2xl relative max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full border border-[#EAE6F3] shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setSelectedOrder(null)}
               className="absolute top-6 right-6 p-2 rounded-full text-[#77738A] hover:bg-gray-100 transition"
@@ -208,7 +272,7 @@ export default function OrdersPage() {
 
             <div className="flex items-center justify-between pb-4 border-b border-gray-100">
               <div>
-                <span className="text-xs font-bold text-[#77738A]">Order Details</span>
+                <span className="text-xs font-bold text-[#77738A]">Order Management</span>
                 <h3 className="text-xl font-black text-[#171428]">{selectedOrder.order_number}</h3>
               </div>
               <div>{getStatusBadge(selectedOrder.order_status)}</div>
@@ -216,7 +280,7 @@ export default function OrdersPage() {
 
             {/* Quick Status Control Bar */}
             <div className="my-5 p-4 rounded-2xl bg-[#F8F6FD] border border-[#EAE6F3]">
-              <div className="text-xs font-bold text-[#171428] mb-2">Update Order Status:</div>
+              <div className="text-xs font-bold text-[#171428] mb-2">Change Order Status:</div>
               <div className="flex flex-wrap gap-2">
                 {(['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as OrderStatus[]).map((st) => (
                   <button
@@ -232,15 +296,86 @@ export default function OrdersPage() {
                   </button>
                 ))}
               </div>
+              {selectedOrder.order_status === 'cancelled' && (
+                <div className="mt-3 text-xs text-[#EF4444] bg-[#FEF2F2] p-2.5 rounded-xl flex items-center space-x-2">
+                  <AlertTriangle size={15} />
+                  <span>Order is cancelled. Product inventory has been automatically restored.</span>
+                </div>
+              )}
             </div>
 
+            {/* Carrier & Shipment Tracking Form */}
+            <form onSubmit={handleSaveFulfillment} className="p-4 rounded-2xl bg-white border border-[#EAE6F3] space-y-3 mb-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 text-xs font-bold text-[#171428]">
+                  <Truck size={16} className="text-[#6515D5]" />
+                  <span>Courier & Delivery Tracking Info</span>
+                </div>
+                {fulfillmentToast && (
+                  <span className="text-[11px] font-bold text-[#10B981] bg-[#ECFDF5] px-2 py-0.5 rounded">
+                    {fulfillmentToast}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block text-[#77738A] font-bold mb-1">Delivery Carrier</label>
+                  <select
+                    value={carrier}
+                    onChange={(e) => setCarrier(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#F7F5FC] border border-[#EAE6F3] rounded-xl text-xs font-semibold text-[#171428]"
+                  >
+                    <option value="GIG Logistics">GIG Logistics</option>
+                    <option value="DHL Express">DHL Express</option>
+                    <option value="Fez Delivery">Fez Delivery</option>
+                    <option value="Red Star Express">Red Star Express</option>
+                    <option value="Kwik Delivery">Kwik Delivery</option>
+                    <option value="ShopEasy Courier Fleet">ShopEasy Courier Fleet</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[#77738A] font-bold mb-1">Waybill / Tracking Number</label>
+                  <input
+                    type="text"
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    placeholder="e.g. GIG-98320491"
+                    className="w-full px-3 py-2 bg-[#F7F5FC] border border-[#EAE6F3] rounded-xl text-xs font-semibold text-[#171428]"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-[#77738A] font-bold mb-1">Estimated Delivery Date / Timeframe</label>
+                  <input
+                    type="text"
+                    value={estimatedDelivery}
+                    onChange={(e) => setEstimatedDelivery(e.target.value)}
+                    placeholder="e.g. 2 - 3 Business Days (Friday, 28th Nov)"
+                    className="w-full px-3 py-2 bg-[#F7F5FC] border border-[#EAE6F3] rounded-xl text-xs font-semibold text-[#171428]"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={savingFulfillment}
+                className="w-full py-2 bg-[#6515D5] hover:bg-[#5510A8] text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5"
+              >
+                <Send size={12} />
+                <span>{savingFulfillment ? 'Saving...' : 'Sync Tracking to Customer Mobile App'}</span>
+              </button>
+            </form>
+
             {/* Customer & Delivery Details */}
-            <div className="space-y-3 text-sm pb-5 border-b border-gray-100">
-              <div className="text-xs font-bold text-[#77738A] uppercase">Delivery Address</div>
+            <div className="space-y-2 text-sm pb-5 border-b border-gray-100">
+              <div className="text-xs font-bold text-[#77738A] uppercase">Destination Address</div>
               <div className="font-bold text-[#171428]">{selectedOrder.customer_name || 'Customer'}</div>
               <div className="text-xs text-[#55516B]">
                 {selectedOrder.delivery_address_snapshot?.address || '12 Victoria Island Boulevard'},{' '}
-                {selectedOrder.delivery_address_snapshot?.city || 'Lagos'}
+                {selectedOrder.delivery_address_snapshot?.city || 'Lagos'},{' '}
+                {selectedOrder.delivery_address_snapshot?.state || 'Lagos State'}
               </div>
               <div className="text-xs text-[#55516B]">
                 Phone: {selectedOrder.customer_phone || selectedOrder.delivery_address_snapshot?.phone || '+234 801 234 5678'}
@@ -250,21 +385,11 @@ export default function OrdersPage() {
             {/* Purchased Items List */}
             <div className="py-4 space-y-3 border-b border-gray-100">
               <div className="text-xs font-bold text-[#77738A] uppercase">Items Ordered</div>
-              {(selectedOrder.items || [
-                {
-                  id: 'item-1',
-                  order_id: selectedOrder.id,
-                  product_name: 'Wireless Headphones',
-                  product_image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=800',
-                  unit_price: selectedOrder.subtotal || 45000,
-                  quantity: 1,
-                  subtotal: selectedOrder.subtotal || 45000,
-                },
-              ]).map((item) => (
+              {(selectedOrder.items || []).map((item) => (
                 <div key={item.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-3">
                     <img
-                      src={item.product_image}
+                      src={item.product_image || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=400'}
                       alt={item.product_name}
                       className="w-12 h-12 rounded-xl object-cover border border-[#EAE6F3]"
                     />
@@ -288,6 +413,12 @@ export default function OrdersPage() {
                 <span>Delivery Fee</span>
                 <span className="font-bold text-[#171428]">{formatNaira(selectedOrder.delivery_fee)}</span>
               </div>
+              {selectedOrder.discount > 0 && (
+                <div className="flex justify-between text-[#10B981]">
+                  <span>Discount</span>
+                  <span className="font-bold">-{formatNaira(selectedOrder.discount)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-base font-black text-[#171428] pt-2 border-t border-gray-100">
                 <span>Grand Total</span>
                 <span className="text-[#6515D5]">{formatNaira(selectedOrder.total_amount)}</span>

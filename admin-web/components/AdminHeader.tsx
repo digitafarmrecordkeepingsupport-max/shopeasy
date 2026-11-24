@@ -9,11 +9,13 @@ import { AdminProfile } from '../types';
 interface AdminHeaderProps {
   searchPlaceholder?: string;
   onSearch?: (query: string) => void;
+  title?: string;
 }
 
 export default function AdminHeader({
   searchPlaceholder = 'Search products, orders...',
   onSearch,
+  title,
 }: AdminHeaderProps) {
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);

@@ -48,6 +48,10 @@ function mapOrder(o: any): Order {
     payment_method: o.payment_method || o.paymentMethod || 'card',
     payment_status: o.payment_status || o.paymentStatus || 'pending',
     order_status: o.order_status || o.orderStatus || 'pending',
+    tracking_number: o.tracking_number || o.trackingNumber || '',
+    carrier: o.carrier || '',
+    estimated_delivery: o.estimated_delivery || o.estimatedDelivery || '',
+    cancellation_reason: o.cancellation_reason || o.cancellationReason || '',
     delivery_address: {
       id: o.delivery_address?.id || 'addr-1',
       recipient_name:

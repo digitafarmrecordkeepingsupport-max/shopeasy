@@ -34,6 +34,9 @@ export interface IOrder extends Document {
     address: string;
   };
   trackingNumber?: string;
+  carrier?: string;
+  estimatedDelivery?: string;
+  cancellationReason?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -87,6 +90,9 @@ const OrderSchema = new Schema<IOrder>(
       address: { type: String, required: true },
     },
     trackingNumber: { type: String },
+    carrier: { type: String },
+    estimatedDelivery: { type: String },
+    cancellationReason: { type: String },
   },
   {
     timestamps: true,

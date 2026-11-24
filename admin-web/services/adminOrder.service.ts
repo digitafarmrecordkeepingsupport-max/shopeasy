@@ -1,5 +1,14 @@
 import { Order, OrderStatus } from '../types';
 
+export interface OrderFulfillmentData {
+  orderStatus?: OrderStatus | string;
+  trackingNumber?: string;
+  carrier?: string;
+  estimatedDelivery?: string;
+  cancellationReason?: string;
+  adminEmail?: string;
+}
+
 export const AdminOrderService = {
   /**
    * Fetches real orders from MongoDB Atlas
@@ -26,6 +35,10 @@ export const AdminOrderService = {
           payment_method: o.paymentMethod || o.payment_method || 'card',
           payment_status: o.paymentStatus || o.payment_status || 'pending',
           order_status: o.orderStatus || o.order_status || 'pending',
+          tracking_number: o.trackingNumber || o.tracking_number || '',
+          carrier: o.carrier || '',
+          estimated_delivery: o.estimatedDelivery || o.estimated_delivery || '',
+          cancellation_reason: o.cancellationReason || o.cancellation_reason || '',
           delivery_address_snapshot: {
             recipient_name: o.deliveryAddress?.recipientName || o.customerName || 'Customer',
             phone: o.deliveryAddress?.phone || o.customerPhone || '',
@@ -66,6 +79,23 @@ export const AdminOrderService = {
       return res.ok;
     } catch (e) {
       console.error('Error updating order status:', e);
+      return false;
+    }
+  },
+
+  /**
+   * Updates order tracking, carrier, estimated delivery, and status
+   */
+  async updateOrderFulfillment(orderId: string, data: OrderFulfillmentData): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('Error updating order fulfillment:', e);
       return false;
     }
   },
